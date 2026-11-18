@@ -1,0 +1,17 @@
+{
+ "block.real_climate.vent_straight": "Вентиляционная шахта прямая",
+ "block.real_climate.vent_straight_up": "Вентиляционная шахта вертикальная",
+ "block.real_climate.vent_elbow_side": "Вентиляционный угол 90° (вбок)",
+ "block.real_climate.vent_elbow_up": "Вентиляционный угол 90° (вверх)",
+ "block.real_climate.vent_elbow_down": "Вентиляционный угол 90° (вниз)",
+ "block.real_climate.vent_tee_side": "Вентиляционный тройник (вбок)",
+ "block.real_climate.vent_tee_up": "Вентиляционный тройник (вверх)",
+ "block.real_climate.vent_tee_down": "Вентиляционный тройник (вниз)",
+ "block.real_climate.vent_cross_side": "Вентиляционная крестовина (вбок)",
+ "block.real_climate.vent_cross_up": "Вентиляционная крестовина (вверх)",
+ "block.real_climate.vent_ceiling_grille": "Потолочная вентиляционная решётка",
+ "block.real_climate.ac_indoor": "Внутренний блок кондиционера",
+ "block.real_climate.ac_outdoor": "Наружный блок кондиционера",
+ "block.real_climate.radiator": "Радиатор отопления",
+ "itemGroup.real_climate": "Real Climate"
+}

@@ -1,0 +1,19 @@
+{
+ "replace": false,
+ "values": [
+  "real_climate:vent_straight",
+  "real_climate:vent_straight_up",
+  "real_climate:vent_elbow_side",
+  "real_climate:vent_elbow_up",
+  "real_climate:vent_elbow_down",
+  "real_climate:vent_tee_side",
+  "real_climate:vent_tee_up",
+  "real_climate:vent_tee_down",
+  "real_climate:vent_cross_side",
+  "real_climate:vent_cross_up",
+  "real_climate:vent_ceiling_grille",
+  "real_climate:ac_indoor",
+  "real_climate:ac_outdoor",
+  "real_climate:radiator"
+ ]
+}

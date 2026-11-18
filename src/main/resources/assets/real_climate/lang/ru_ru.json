@@ -13,5 +13,6 @@
  "block.real_climate.ac_indoor": "Внутренний блок кондиционера",
  "block.real_climate.ac_outdoor": "Наружный блок кондиционера",
  "block.real_climate.radiator": "Радиатор отопления",
- "itemGroup.real_climate": "Real Climate"
+ "itemGroup.real_climate": "Real Climate",
+ "item.real_climate.hammer": "Молоточек"
 }

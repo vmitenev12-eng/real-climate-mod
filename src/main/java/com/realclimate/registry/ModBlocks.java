@@ -3,6 +3,7 @@ package com.realclimate.registry;
 import com.realclimate.RealClimate;
 import com.realclimate.block.FacingBlock;
 import net.minecraft.world.item.BlockItem;
+import com.realclimate.item.HammerItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.SoundType;
@@ -19,6 +20,8 @@ public final class ModBlocks {
     public static final DeferredRegister<Item> ITEMS = DeferredRegister.create(ForgeRegistries.ITEMS, RealClimate.MODID);
     /** Все блоки мода в порядке регистрации (для вкладки креатива). */
     public static final Map<String, RegistryObject<Block>> ALL = new LinkedHashMap<>();
+
+    public static final RegistryObject<Item> HAMMER = ITEMS.register("hammer", () -> new HammerItem(new Item.Properties().stacksTo(1)));
 
     private static BlockBehaviour.Properties metal() {
         return BlockBehaviour.Properties.of().strength(2.0f, 6.0f).sound(SoundType.METAL).noOcclusion().requiresCorrectToolForDrops();

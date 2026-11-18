@@ -5,6 +5,7 @@ import com.realclimate.RealClimate;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.event.server.ServerStartingEvent;
@@ -30,7 +31,21 @@ public final class ClimateEvents {
 
     @SubscribeEvent
     public static void onCommands(RegisterCommandsEvent e) {
-        e.getDispatcher().register(Commands.literal("climate").executes(ClimateEvents::info));
+        e.getDispatcher().register(Commands.literal("climate")
+                .executes(ClimateEvents::info)
+                .then(Commands.literal("body").executes(ClimateEvents::body)));
+    }
+
+    private static int body(CommandContext<CommandSourceStack> ctx) {
+        CommandSourceStack src = ctx.getSource();
+        if (!(src.getEntity() instanceof ServerPlayer p)) {
+            src.sendFailure(Component.literal("Команда доступна только игроку."));
+            return 0;
+        }
+        String text = String.format("Тело: %.1f °C | воздух вокруг: %.1f °C | утепление: %.0f%%",
+                BodyTemperature.get(p), BodyTemperature.effectiveAmbient(p), BodyTemperature.insulation(p) * 100);
+        src.sendSuccess(() -> Component.literal(text), false);
+        return 1;
     }
 
     private static int info(CommandContext<CommandSourceStack> ctx) {

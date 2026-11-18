@@ -1,0 +1,19 @@
+{
+ "variants": {
+  "facing=north": {
+   "model": "real_climate:block/vent_tee_down"
+  },
+  "facing=east": {
+   "model": "real_climate:block/vent_tee_down",
+   "y": 90
+  },
+  "facing=south": {
+   "model": "real_climate:block/vent_tee_down",
+   "y": 180
+  },
+  "facing=west": {
+   "model": "real_climate:block/vent_tee_down",
+   "y": 270
+  }
+ }
+}

@@ -15,7 +15,7 @@ public final class ModCreativeTab {
             CreativeModeTab.builder()
                     .title(Component.translatable("itemGroup.real_climate"))
                     .icon(() -> ModBlocks.ALL.get("radiator").get().asItem().getDefaultInstance())
-                    .displayItems((params, out) -> ModBlocks.ALL.values().forEach(b -> out.accept(b.get())))
+                    .displayItems((params, out) -> { out.accept(ModBlocks.HAMMER.get()); ModBlocks.ALL.values().forEach(b -> out.accept(b.get())); })
                     .build());
 
     private ModCreativeTab() {}

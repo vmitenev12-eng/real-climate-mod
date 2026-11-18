@@ -1,0 +1,613 @@
+{
+ "format_version": "1.9.0",
+ "parent": "block/cube",
+ "textures": {
+  "particle": "real_climate:block/vent_metal",
+  "body": "real_climate:block/vent_metal"
+ },
+ "elements": [
+  {
+   "name": "main_case_hollow",
+   "from": [
+    0,
+    16,
+    0
+   ],
+   "to": [
+    16,
+    16,
+    16
+   ],
+   "rotation": {
+    "angle": 0,
+    "axis": "z",
+    "origin": [
+     0,
+     1,
+     0
+    ]
+   },
+   "faces": {
+    "north": {
+     "uv": [
+      2,
+      0,
+      15,
+      16
+     ],
+     "rotation": 270,
+     "texture": "#body"
+    },
+    "east": {
+     "uv": [
+      0,
+      2,
+      16,
+      15
+     ],
+     "rotation": 180,
+     "texture": "#body"
+    },
+    "south": {
+     "uv": [
+      2,
+      0,
+      15,
+      16
+     ],
+     "rotation": 90,
+     "texture": "#body"
+    },
+    "west": {
+     "uv": [
+      0,
+      2,
+      16,
+      15
+     ],
+     "texture": "#body"
+    },
+    "up": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "rotation": 90,
+     "texture": "#body"
+    },
+    "down": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "rotation": 90,
+     "texture": "#body"
+    }
+   }
+  },
+  {
+   "name": "main_case_hollow",
+   "from": [
+    16,
+    0,
+    0
+   ],
+   "to": [
+    16,
+    16,
+    16
+   ],
+   "rotation": {
+    "angle": 0,
+    "axis": "y",
+    "origin": [
+     31,
+     0,
+     0
+    ]
+   },
+   "faces": {
+    "north": {
+     "uv": [
+      2,
+      0,
+      15,
+      16
+     ],
+     "texture": "#body"
+    },
+    "east": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#body"
+    },
+    "south": {
+     "uv": [
+      2,
+      0,
+      15,
+      16
+     ],
+     "texture": "#body"
+    },
+    "west": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "texture": "#body"
+    },
+    "up": {
+     "uv": [
+      0,
+      2,
+      16,
+      15
+     ],
+     "rotation": 90,
+     "texture": "#body"
+    },
+    "down": {
+     "uv": [
+      0,
+      2,
+      16,
+      15
+     ],
+     "rotation": 270,
+     "texture": "#body"
+    }
+   }
+  },
+  {
+   "name": "main_case_hollow",
+   "from": [
+    0,
+    0,
+    0
+   ],
+   "to": [
+    16,
+    0,
+    16
+   ],
+   "rotation": {
+    "angle": 0,
+    "axis": "z",
+    "origin": [
+     16,
+     15,
+     0
+    ]
+   },
+   "faces": {
+    "north": {
+     "uv": [
+      2,
+      0,
+      15,
+      16
+     ],
+     "rotation": 90,
+     "texture": "#body"
+    },
+    "east": {
+     "uv": [
+      0,
+      2,
+      16,
+      15
+     ],
+     "rotation": 180,
+     "texture": "#body"
+    },
+    "south": {
+     "uv": [
+      2,
+      0,
+      15,
+      16
+     ],
+     "rotation": 270,
+     "texture": "#body"
+    },
+    "west": {
+     "uv": [
+      0,
+      2,
+      16,
+      15
+     ],
+     "texture": "#body"
+    },
+    "up": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "rotation": 270,
+     "texture": "#body"
+    },
+    "down": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "rotation": 270,
+     "texture": "#body"
+    }
+   }
+  },
+  {
+   "name": "main_case_hollow",
+   "from": [
+    0,
+    0,
+    0
+   ],
+   "to": [
+    0,
+    16,
+    1
+   ],
+   "rotation": {
+    "angle": 0,
+    "axis": "z",
+    "origin": [
+     -15,
+     16,
+     0
+    ]
+   },
+   "faces": {
+    "north": {
+     "uv": [
+      2,
+      0,
+      15,
+      16
+     ],
+     "rotation": 180,
+     "texture": "#body"
+    },
+    "east": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "rotation": 180,
+     "texture": "#body"
+    },
+    "south": {
+     "uv": [
+      2,
+      0,
+      15,
+      16
+     ],
+     "rotation": 180,
+     "texture": "#body"
+    },
+    "west": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "rotation": 180,
+     "texture": "#body"
+    },
+    "up": {
+     "uv": [
+      0,
+      2,
+      16,
+      15
+     ],
+     "rotation": 90,
+     "texture": "#body"
+    },
+    "down": {
+     "uv": [
+      0,
+      2,
+      16,
+      15
+     ],
+     "rotation": 270,
+     "texture": "#body"
+    }
+   }
+  },
+  {
+   "name": "main_case_hollow",
+   "from": [
+    0,
+    0,
+    15
+   ],
+   "to": [
+    0,
+    16,
+    16
+   ],
+   "rotation": {
+    "angle": 0,
+    "axis": "z",
+    "origin": [
+     -15,
+     16,
+     15
+    ]
+   },
+   "faces": {
+    "north": {
+     "uv": [
+      2,
+      0,
+      15,
+      16
+     ],
+     "rotation": 180,
+     "texture": "#body"
+    },
+    "east": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "rotation": 180,
+     "texture": "#body"
+    },
+    "south": {
+     "uv": [
+      2,
+      0,
+      15,
+      16
+     ],
+     "rotation": 180,
+     "texture": "#body"
+    },
+    "west": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "rotation": 180,
+     "texture": "#body"
+    },
+    "up": {
+     "uv": [
+      0,
+      2,
+      16,
+      15
+     ],
+     "rotation": 90,
+     "texture": "#body"
+    },
+    "down": {
+     "uv": [
+      0,
+      2,
+      16,
+      15
+     ],
+     "rotation": 270,
+     "texture": "#body"
+    }
+   }
+  },
+  {
+   "name": "main_case_hollow",
+   "from": [
+    0,
+    0,
+    0
+   ],
+   "to": [
+    1,
+    16,
+    0
+   ],
+   "rotation": {
+    "angle": 0,
+    "axis": "z",
+    "origin": [
+     1,
+     16,
+     -15
+    ]
+   },
+   "faces": {
+    "north": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "rotation": 180,
+     "texture": "#body"
+    },
+    "east": {
+     "uv": [
+      2,
+      0,
+      15,
+      16
+     ],
+     "rotation": 180,
+     "texture": "#body"
+    },
+    "south": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "rotation": 180,
+     "texture": "#body"
+    },
+    "west": {
+     "uv": [
+      2,
+      0,
+      15,
+      16
+     ],
+     "rotation": 180,
+     "texture": "#body"
+    },
+    "up": {
+     "uv": [
+      0,
+      2,
+      16,
+      15
+     ],
+     "rotation": 180,
+     "texture": "#body"
+    },
+    "down": {
+     "uv": [
+      0,
+      2,
+      16,
+      15
+     ],
+     "rotation": 180,
+     "texture": "#body"
+    }
+   }
+  },
+  {
+   "name": "main_case_hollow",
+   "from": [
+    0,
+    0,
+    16
+   ],
+   "to": [
+    1,
+    16,
+    16
+   ],
+   "rotation": {
+    "angle": 0,
+    "axis": "z",
+    "origin": [
+     1,
+     16,
+     1
+    ]
+   },
+   "faces": {
+    "north": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "rotation": 180,
+     "texture": "#body"
+    },
+    "east": {
+     "uv": [
+      2,
+      0,
+      15,
+      16
+     ],
+     "rotation": 180,
+     "texture": "#body"
+    },
+    "south": {
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ],
+     "rotation": 180,
+     "texture": "#body"
+    },
+    "west": {
+     "uv": [
+      2,
+      0,
+      15,
+      16
+     ],
+     "rotation": 180,
+     "texture": "#body"
+    },
+    "up": {
+     "uv": [
+      0,
+      2,
+      16,
+      15
+     ],
+     "rotation": 180,
+     "texture": "#body"
+    },
+    "down": {
+     "uv": [
+      0,
+      2,
+      16,
+      15
+     ],
+     "rotation": 180,
+     "texture": "#body"
+    }
+   }
+  }
+ ],
+ "groups": [
+  {
+   "name": "air_conditioner_industrial_outdoor",
+   "origin": [
+    8,
+    8,
+    8
+   ],
+   "scope": 0,
+   "color": 0,
+   "children": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+   ]
+  }
+ ]
+}

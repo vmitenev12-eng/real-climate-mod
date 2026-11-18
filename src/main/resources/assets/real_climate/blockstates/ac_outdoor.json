@@ -1,0 +1,19 @@
+{
+ "variants": {
+  "facing=north": {
+   "model": "real_climate:block/ac_outdoor"
+  },
+  "facing=east": {
+   "model": "real_climate:block/ac_outdoor",
+   "y": 90
+  },
+  "facing=south": {
+   "model": "real_climate:block/ac_outdoor",
+   "y": 180
+  },
+  "facing=west": {
+   "model": "real_climate:block/ac_outdoor",
+   "y": 270
+  }
+ }
+}

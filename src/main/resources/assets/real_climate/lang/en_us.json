@@ -1,0 +1,18 @@
+{
+ "block.real_climate.vent_straight": "Straight Vent Duct",
+ "block.real_climate.vent_straight_up": "Vertical Vent Duct",
+ "block.real_climate.vent_elbow_side": "Vent Elbow 90° (Side)",
+ "block.real_climate.vent_elbow_up": "Vent Elbow 90° (Up)",
+ "block.real_climate.vent_elbow_down": "Vent Elbow 90° (Down)",
+ "block.real_climate.vent_tee_side": "Vent Tee (Side)",
+ "block.real_climate.vent_tee_up": "Vent Tee (Up)",
+ "block.real_climate.vent_tee_down": "Vent Tee (Down)",
+ "block.real_climate.vent_cross_side": "Vent Cross (Side)",
+ "block.real_climate.vent_cross_up": "Vent Cross (Up)",
+ "block.real_climate.vent_ceiling_grille": "Ceiling Vent Grille",
+ "block.real_climate.ac_indoor": "Air Conditioner Indoor Unit",
+ "block.real_climate.ac_outdoor": "Air Conditioner Outdoor Unit",
+ "block.real_climate.radiator": "Heating Radiator",
+ "itemGroup.real_climate": "Real Climate",
+ "item.real_climate.hammer": "Hammer"
+}

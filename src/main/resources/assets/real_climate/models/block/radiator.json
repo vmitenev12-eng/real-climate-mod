@@ -1,6 +1,5 @@
 {
  "format_version": "1.9.0",
- "parent": "real_climate:block/heating_radiator",
  "textures": {
   "2": "real_climate:block/conditioner_body",
   "3": "real_climate:block/radiator_body",

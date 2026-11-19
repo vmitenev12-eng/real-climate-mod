@@ -49,7 +49,13 @@ public class ACOutdoorBlockEntity extends BlockEntity {
     public double getTargetTemp() { return targetTemp; }
     public void setTargetTemp(double t) {
         double clamped = Math.max(-20.0, Math.min(95.0, t));
-        if (targetTemp != clamped) { targetTemp = clamped; setChanged(); }
+        if (targetTemp != clamped) {
+            targetTemp = clamped;
+            setChanged();
+            if (level != null && !level.isClientSide) {
+                level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+            }
+        }
     }
 
     @Override
@@ -87,7 +93,7 @@ public class ACOutdoorBlockEntity extends BlockEntity {
     public void load(CompoundTag tag) {
         super.load(tag);
         enabled = tag.getBoolean("Enabled");
-        targetTemp = tag.getDouble("TargetTemp");
+        targetTemp = Math.max(-20.0, Math.min(95.0, tag.getDouble("TargetTemp")));
         linkedIndoors.clear();
         CompoundTag linked = tag.getCompound("Linked");
         linkedPanels.clear();
@@ -105,7 +111,7 @@ public class ACOutdoorBlockEntity extends BlockEntity {
     public void onRemove() {
         linkedIndoors.clear();
         linkedPanels.clear();
-        if (level != null && !level.isClientSide) VentilationService.removeSource(level, worldPosition);
+        if (level != null) VentilationService.removeSource(level, worldPosition);
     }
 
     public static void serverTick(Level level, BlockPos pos, BlockState state, ACOutdoorBlockEntity be) {
@@ -142,10 +148,20 @@ public class ACOutdoorBlockEntity extends BlockEntity {
             }
         }
 
-        propagateThroughVentilation(level, pos, target);
+        propagateThroughVentilation(level, pos, target, true);
     }
 
-    private static void propagateThroughVentilation(Level level, BlockPos outdoorPos, double targetTemp) {
+    public static void clientTick(Level level, BlockPos pos, ACOutdoorBlockEntity be) {
+        if (level.getGameTime() % 20 != 0) return;
+        if (!be.isEnabled()) {
+            VentilationService.removeSource(level, pos);
+            return;
+        }
+        propagateThroughVentilation(level, pos, be.getTargetTemp(), false);
+    }
+
+    private static void propagateThroughVentilation(Level level, BlockPos outdoorPos, double targetTemp,
+                                                    boolean updateBlockEntities) {
         Queue<BlockPos> queue = new ArrayDeque<>();
         Set<BlockPos> visited = new HashSet<>();
         java.util.Map<BlockPos, Double> airflow = new java.util.HashMap<>();
@@ -182,12 +198,13 @@ public class ACOutdoorBlockEntity extends BlockEntity {
                             ? (level.getBlockEntity(next) instanceof com.realclimate.tileentity.GrilleBlockEntity ? 0.0 : 2.0)
                             : Math.max(0.0, (expectedConnections - connected) / (double) expectedConnections);
                     airflow.put(next.immutable(), loss);
-                    if (nextState.getBlock() instanceof com.realclimate.block.VentBlock
+                    if (updateBlockEntities && nextState.getBlock() instanceof com.realclimate.block.VentBlock
                             && level.getBlockEntity(next) instanceof com.realclimate.tileentity.VentBlockEntity vent) {
                         vent.setSealed(loss == 0.0);
                         vent.setTempBuffer(targetTemp);
                     }
-                    if (level.getBlockEntity(next) instanceof com.realclimate.tileentity.GrilleBlockEntity grille) {
+                    if (updateBlockEntities
+                            && level.getBlockEntity(next) instanceof com.realclimate.tileentity.GrilleBlockEntity grille) {
                         grille.setTargetTemp(targetTemp);
                     }
                     queue.add(next);

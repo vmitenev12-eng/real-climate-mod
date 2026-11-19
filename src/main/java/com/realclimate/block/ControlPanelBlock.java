@@ -17,14 +17,14 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
-import net.minecraft.world.level.block.state.properties.DirectionProperty;
+import net.minecraft.world.level.block.state.properties.IntegerProperty;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
 
 public class ControlPanelBlock extends Block implements EntityBlock {
-    public static final DirectionProperty FACING = DirectionProperty.create("facing", Direction.Plane.HORIZONTAL);
+    public static final IntegerProperty FACING = IntegerProperty.create("facing", 0, 3);
     private static final VoxelShape SHAPE = Shapes.or(
                 Shapes.box(2.0 / 16.0, 3.0 / 16.0, 13.0 / 16.0, 14.0 / 16.0, 13.0 / 16.0, 15.0 / 16.0),
                 Shapes.box(5.0 / 16.0, 6.0 / 16.0, 12.0 / 16.0, 11.0 / 16.0, 8.0 / 16.0, 13.0 / 16.0),
@@ -32,7 +32,7 @@ public class ControlPanelBlock extends Block implements EntityBlock {
 
     public ControlPanelBlock(BlockBehaviour.Properties properties) {
         super(properties);
-        registerDefaultState(stateDefinition.any().setValue(FACING, Direction.NORTH));
+        registerDefaultState(stateDefinition.any().setValue(FACING, 0));
     }
 
     @Override
@@ -42,28 +42,30 @@ public class ControlPanelBlock extends Block implements EntityBlock {
 
     @Override
     public BlockState getStateForPlacement(BlockPlaceContext context) {
-        return defaultBlockState().setValue(FACING, context.getHorizontalDirection().getOpposite());
+        return defaultBlockState().setValue(FACING, FacingBlock.directionToIndex(context.getHorizontalDirection().getOpposite()));
     }
 
     @Override
     public BlockState rotate(BlockState state, Rotation rotation) {
-        return state.setValue(FACING, rotation.rotate(state.getValue(FACING)));
+        return state.setValue(FACING, FacingBlock.directionToIndex(rotation.rotate(FacingBlock.indexToDirection(state.getValue(FACING)))));
     }
 
     @Override
     public BlockState mirror(BlockState state, Mirror mirror) {
-        return state.rotate(mirror.getRotation(state.getValue(FACING)));
+        Direction direction = FacingBlock.indexToDirection(state.getValue(FACING));
+        Direction mirrored = mirror.mirror(direction);
+        return state.setValue(FACING, FacingBlock.directionToIndex(mirrored));
     }
 
     @Override
     public VoxelShape getShape(BlockState state, net.minecraft.world.level.BlockGetter level, BlockPos pos, CollisionContext context) {
-        return FacingBlock.rotateShape(SHAPE, state.getValue(FACING));
+        return FacingBlock.rotateShape(SHAPE, FacingBlock.indexToDirection(state.getValue(FACING)));
     }
 
     @Override
     public VoxelShape getCollisionShape(BlockState state, net.minecraft.world.level.BlockGetter level,
                                         BlockPos pos, CollisionContext context) {
-        return FacingBlock.rotateShape(SHAPE, state.getValue(FACING));
+        return FacingBlock.rotateShape(SHAPE, FacingBlock.indexToDirection(state.getValue(FACING)));
     }
 
     @Override

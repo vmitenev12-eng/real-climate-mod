@@ -4,7 +4,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
-import net.minecraft.world.level.block.state.properties.DirectionProperty;
+import net.minecraft.world.level.block.state.properties.IntegerProperty;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -22,7 +22,7 @@ import java.util.IdentityHashMap;
 import java.util.Map;
 
 public class FacingBlock extends Block implements EntityBlock {
-    public static final DirectionProperty FACING = DirectionProperty.create("facing", Direction.Plane.HORIZONTAL);
+    public static final IntegerProperty FACING = IntegerProperty.create("facing", 0, 3);
     private static final Map<VoxelShape, EnumMap<Direction, VoxelShape>> ROTATED_SHAPES = new IdentityHashMap<>();
     protected final VoxelShape shape;
 
@@ -46,23 +46,37 @@ public class FacingBlock extends Block implements EntityBlock {
 
     @Override
     public BlockState getStateForPlacement(BlockPlaceContext c) {
-        return defaultBlockState().setValue(FACING, c.getHorizontalDirection().getOpposite());
+        return defaultBlockState().setValue(FACING, directionToIndex(c.getHorizontalDirection().getOpposite()));
     }
 
     @Override
-    public BlockState rotate(BlockState s, Rotation r) { return s.setValue(FACING, r.rotate(s.getValue(FACING))); }
+    public BlockState rotate(BlockState s, Rotation r) {
+        Direction direction = r.rotate(indexToDirection(s.getValue(FACING)));
+        return s.setValue(FACING, directionToIndex(direction));
+    }
 
     @Override
-    public BlockState mirror(BlockState s, Mirror m) { return s.rotate(m.getRotation(s.getValue(FACING))); }
+    public BlockState mirror(BlockState s, Mirror m) {
+        Direction direction = m.mirror(indexToDirection(s.getValue(FACING)));
+        return s.setValue(FACING, directionToIndex(direction));
+    }
 
     @Override
     public VoxelShape getShape(BlockState s, BlockGetter g, BlockPos p, CollisionContext c) {
-        return rotateShape(shape, s.getValue(FACING));
+        return rotateShape(shape, indexToDirection(s.getValue(FACING)));
     }
 
     @Override
     public VoxelShape getCollisionShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {
-        return rotateShape(shape, state.getValue(FACING));
+        return rotateShape(shape, indexToDirection(state.getValue(FACING)));
+    }
+
+    public static int directionToIndex(Direction direction) {
+        return switch (direction) { case EAST -> 1; case SOUTH -> 2; case WEST -> 3; default -> 0; };
+    }
+
+    public static Direction indexToDirection(int index) {
+        return switch (index) { case 1 -> Direction.EAST; case 2 -> Direction.SOUTH; case 3 -> Direction.WEST; default -> Direction.NORTH; };
     }
 
     public static VoxelShape rotateShape(VoxelShape shape, Direction facing) {
@@ -71,12 +85,9 @@ public class FacingBlock extends Block implements EntityBlock {
             if (cache == null) {
                 cache = new EnumMap<>(Direction.class);
                 cache.put(Direction.NORTH, shape);
-                for (Direction direction : Direction.Plane.HORIZONTAL) {
-                    if (direction != Direction.NORTH) cache.put(direction, rotateShapeUncached(shape, direction));
-                }
                 ROTATED_SHAPES.put(shape, cache);
             }
-            return cache.get(facing);
+            return cache.computeIfAbsent(facing, direction -> rotateShapeUncached(shape, direction));
         }
     }
 

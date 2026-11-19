@@ -80,7 +80,8 @@ public class InstallationKeyItem extends Item {
                 player.displayClientMessage(Component.literal("Наружный блок не найден или выгружен"), true);
                 return InteractionResult.CONSUME;
             }
-            if (panel.linkOutdoor(outdoorPos)) outdoor.linkPanel(pos);
+            panel.linkOutdoor(outdoorPos);
+            outdoor.linkPanel(pos);
             outdoor.setChanged();
             panel.setChanged();
             sync(level, outdoorPos, outdoor);

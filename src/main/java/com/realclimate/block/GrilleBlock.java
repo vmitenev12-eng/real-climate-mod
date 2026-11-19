@@ -22,26 +22,27 @@ import com.realclimate.registry.ModBlockEntities;
 
 public class GrilleBlock extends FacingBlock {
     public static final BooleanProperty OPEN = BooleanProperty.create("open");
-        protected static final VoxelShape SHAPE = createGrilleShape();
+    protected static final VoxelShape SHAPE = createGrilleShape();
+    private static final VoxelShape OUTLINE_SHAPE = Shapes.box(0.0, 0.0, 0.0, 1.0, 1.0, 1.0 / 16.0);
 
-        private static VoxelShape createGrilleShape() {
-            VoxelShape shape = Shapes.or(
+    private static VoxelShape createGrilleShape() {
+        VoxelShape shape = Shapes.or(
             Shapes.box(0.0, 0.0, 0.0, 1.0, 1.0, 1.0 / 16.0),
             Shapes.box(0.0, 0.0, 15.0 / 16.0, 1.0, 1.0, 1.0),
             Shapes.box(0.0, 0.0, 1.0 / 16.0, 1.0 / 16.0, 1.0, 15.0 / 16.0),
-                Shapes.box(15.0 / 16.0, 0.0, 1.0 / 16.0, 1.0, 1.0, 15.0 / 16.0));
-            for (double offset : new double[]{0.0, 2.15, 4.3, 6.45, 8.6, 10.7, 12.85, 15.0}) {
-                double min = offset / 16.0;
-                double max = Math.min(1.0, (offset + 1.0) / 16.0);
-                shape = Shapes.or(shape, Shapes.box(min, 0.0, 0.0, max, 0.5 / 16.0, 1.0));
-                shape = Shapes.or(shape, Shapes.box(0.0, 0.0, min, 1.0, 0.5 / 16.0, max));
-            }
-            return shape;
+            Shapes.box(15.0 / 16.0, 0.0, 1.0 / 16.0, 1.0, 1.0, 15.0 / 16.0));
+        for (double offset : new double[]{0.0, 2.15, 4.3, 6.45, 8.6, 10.7, 12.85, 15.0}) {
+            double min = offset / 16.0;
+            double max = Math.min(1.0, (offset + 1.0) / 16.0);
+            shape = Shapes.or(shape, Shapes.box(min, 0.0, 0.0, max, 0.5 / 16.0, 1.0));
+            shape = Shapes.or(shape, Shapes.box(0.0, 0.0, min, 1.0, 0.5 / 16.0, max));
         }
+        return shape;
+    }
 
     public GrilleBlock(Properties props) {
         super(props, SHAPE);
-        registerDefaultState(stateDefinition.any().setValue(FACING, net.minecraft.core.Direction.NORTH).setValue(OPEN, true));
+        registerDefaultState(stateDefinition.any().setValue(FACING, 0).setValue(OPEN, true));
     }
 
     @Override
@@ -51,18 +52,12 @@ public class GrilleBlock extends FacingBlock {
 
     @Override
     public BlockState getStateForPlacement(BlockPlaceContext c) {
-        return defaultBlockState().setValue(FACING, c.getHorizontalDirection().getOpposite()).setValue(OPEN, true);
+        return defaultBlockState().setValue(FACING, directionToIndex(c.getHorizontalDirection().getOpposite())).setValue(OPEN, true);
     }
 
     @Override
-    public BlockState rotate(BlockState s, Rotation r) { return s.setValue(FACING, r.rotate(s.getValue(FACING))); }
-
-    @Override
-    public BlockState mirror(BlockState s, Mirror m) { return s.rotate(m.getRotation(s.getValue(FACING))); }
-
-    @Override
     public VoxelShape getShape(BlockState s, BlockGetter g, BlockPos p, CollisionContext c) {
-        return rotateShape(SHAPE, s.getValue(FACING));
+        return rotateShape(OUTLINE_SHAPE, indexToDirection(s.getValue(FACING)));
     }
 
     @Override

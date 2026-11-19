@@ -2,6 +2,7 @@ package com.realclimate.client;
 
 import com.realclimate.RealClimate;
 import com.realclimate.climate.BodyTemperature;
+import com.realclimate.climate.VentilationService;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
@@ -24,6 +25,7 @@ import java.util.List;
 @Mod.EventBusSubscriber(modid = RealClimate.MODID, value = net.minecraftforge.api.distmarker.Dist.CLIENT)
 public final class KeyOverlayRenderer {
     private static final int LINK_SCAN_RADIUS_CHUNKS = 2;
+    private static final int LINK_SCAN_INTERVAL_TICKS = 10;
     private static List<LinkLine> cachedLinkLines = List.of();
     private static net.minecraft.client.multiplayer.ClientLevel cachedLevel;
     private static long lastLinkScan = Long.MIN_VALUE;
@@ -36,14 +38,20 @@ public final class KeyOverlayRenderer {
     public static void onClientTick(TickEvent.ClientTickEvent event) {
         if (event.phase != TickEvent.Phase.END) return;
         Minecraft mc = Minecraft.getInstance();
+        if (cachedLevel != mc.level) {
+            if (cachedLevel != null) VentilationService.clear(cachedLevel);
+            cachedLinkLines = List.of();
+            lastLinkScan = Long.MIN_VALUE;
+        }
         if (mc.level == null || mc.player == null || !isHoldingInstallationKey(mc)) {
             cachedLinkLines = List.of();
             cachedLevel = mc.level;
+            lastLinkScan = Long.MIN_VALUE;
             return;
         }
 
         long gameTime = mc.level.getGameTime();
-        if (cachedLevel == mc.level && gameTime - lastLinkScan < 100) return;
+        if (cachedLevel == mc.level && gameTime - lastLinkScan < LINK_SCAN_INTERVAL_TICKS) return;
         cachedLevel = mc.level;
         lastLinkScan = gameTime;
 

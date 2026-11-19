@@ -109,27 +109,39 @@ public final class BodyTemperature {
         boolean enclosed = !level.canSeeSky(pos);
         if (state.is(Blocks.LAVA)) return enclosed ? 8.0 : 4.0;
         if (state.is(BlockTags.FIRE)) return enclosed ? 6.0 : 3.0;
-        if (state.is(BlockTags.CAMPFIRES) && state.hasProperty(net.minecraft.world.level.block.CampfireBlock.LIT)
-                && state.getValue(net.minecraft.world.level.block.CampfireBlock.LIT)) return enclosed ? 7.0 : 4.0;
+        if (state.is(BlockTags.CAMPFIRES) && hasBooleanProperty(state, "lit", true)) return enclosed ? 7.0 : 4.0;
         if ((state.is(Blocks.FURNACE) || state.is(Blocks.BLAST_FURNACE) || state.is(Blocks.SMOKER))
-                && state.hasProperty(net.minecraft.world.level.block.state.properties.BlockStateProperties.LIT)
-                && state.getValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.LIT)) return enclosed ? 5.0 : 2.0;
+                && hasBooleanProperty(state, "lit", true)) return enclosed ? 5.0 : 2.0;
         if (state.is(Blocks.TORCH) || state.is(Blocks.WALL_TORCH)) return enclosed ? 1.0 : 0.5;
 
-        BlockEntity entity = level.getBlockEntity(pos);
-        if (entity instanceof com.realclimate.tileentity.RadiatorBlockEntity radiator && radiator.isEnabled()) {
+        if (state.getBlock() instanceof com.realclimate.block.RadiatorBlock
+                && level.getBlockEntity(pos) instanceof com.realclimate.tileentity.RadiatorBlockEntity radiator
+                && radiator.isEnabled()) {
             return Math.max(0.0, radiator.getTargetTemp() - ClimateService.getTemperature(level, pos)) * 0.45;
         }
-        if (entity instanceof com.realclimate.tileentity.ACIndoorBlockEntity indoor && indoor.isEnabled()
-            && state.hasProperty(com.realclimate.block.ACIndoorBlock.ACTIVE)
-            && state.getValue(com.realclimate.block.ACIndoorBlock.ACTIVE)) {
+        if (state.getBlock() instanceof com.realclimate.block.ACIndoorBlock
+                && state.hasProperty(com.realclimate.block.ACIndoorBlock.ACTIVE)
+                && state.getValue(com.realclimate.block.ACIndoorBlock.ACTIVE)
+                && level.getBlockEntity(pos) instanceof com.realclimate.tileentity.ACIndoorBlockEntity indoor
+                && indoor.isEnabled()) {
             return (indoor.getTargetTemp() - ClimateService.getTemperature(level, pos)) * 0.85;
         }
-        if (entity instanceof com.realclimate.tileentity.GrilleBlockEntity grille && grille.isOpen()
-            && VentilationService.hasActiveAirflow(level, pos)) {
-            return (grille.getTargetTemp() - ClimateService.getTemperature(level, pos)) * 0.8;
+        if (state.getBlock() instanceof com.realclimate.block.GrilleBlock
+                && level.getBlockEntity(pos) instanceof com.realclimate.tileentity.GrilleBlockEntity grille
+                && grille.isOpen() && VentilationService.hasActiveAirflow(level, pos)) {
+            double airflowTemp = VentilationService.airflowTemperature(level, pos, grille.getTargetTemp());
+            return (airflowTemp - ClimateService.getTemperature(level, pos)) * 0.8;
         }
         return 0.0;
+    }
+
+    private static boolean hasBooleanProperty(BlockState state, String name, boolean expected) {
+        for (net.minecraft.world.level.block.state.properties.Property<?> property : state.getProperties()) {
+            if (!property.getName().equals(name)) continue;
+            Object value = state.getValue(property);
+            return String.valueOf(value).equals(expected ? "true" : "false");
+        }
+        return false;
     }
 
     /** Теплоизоляция брони: 0..1. */

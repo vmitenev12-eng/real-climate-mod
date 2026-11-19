@@ -10,26 +10,26 @@ import java.util.Map;
 import java.util.Set;
 
 public final class VentilationService {
-    private static final Map<ResourceKey<Level>, Map<Long, Map<Long, AirFlow>>> SOURCES = new HashMap<>();
+    private static final Map<WorldKey, Map<Long, Map<Long, AirFlow>>> SOURCES = new HashMap<>();
 
     private VentilationService() {}
 
     public static synchronized void updatePath(Level level, BlockPos source, Map<BlockPos, Double> leakage, double temperature) {
-        Map<Long, Map<Long, AirFlow>> dimensionFlows = SOURCES.computeIfAbsent(level.dimension(), key -> new HashMap<>());
+        Map<Long, Map<Long, AirFlow>> dimensionFlows = SOURCES.computeIfAbsent(worldKey(level), key -> new HashMap<>());
         Map<Long, AirFlow> route = new HashMap<>();
         leakage.forEach((pos, loss) -> route.put(pos.asLong(), new AirFlow(temperature, Math.max(0.0, Math.min(2.0, loss)))));
         dimensionFlows.put(source.asLong(), route);
     }
 
     public static synchronized void removeSource(Level level, BlockPos source) {
-        Map<Long, Map<Long, AirFlow>> dimensionFlows = SOURCES.get(level.dimension());
+        Map<Long, Map<Long, AirFlow>> dimensionFlows = SOURCES.get(worldKey(level));
         if (dimensionFlows == null) return;
         dimensionFlows.remove(source.asLong());
-        if (dimensionFlows.isEmpty()) SOURCES.remove(level.dimension());
+        if (dimensionFlows.isEmpty()) SOURCES.remove(worldKey(level));
     }
 
     public static synchronized boolean hasActiveAirflow(Level level, BlockPos grillePos) {
-        Map<Long, Map<Long, AirFlow>> dimensionFlows = SOURCES.get(level.dimension());
+        Map<Long, Map<Long, AirFlow>> dimensionFlows = SOURCES.get(worldKey(level));
         if (dimensionFlows == null) return false;
         long packedPos = grillePos.asLong();
         for (Map<Long, AirFlow> route : dimensionFlows.values()) {
@@ -38,8 +38,25 @@ public final class VentilationService {
         return false;
     }
 
+    public static synchronized double airflowTemperature(Level level, BlockPos pos, double fallback) {
+        Map<Long, Map<Long, AirFlow>> dimensionFlows = SOURCES.get(worldKey(level));
+        if (dimensionFlows == null) return fallback;
+
+        double total = 0.0;
+        int sources = 0;
+        long packedPos = pos.asLong();
+        for (Map<Long, AirFlow> route : dimensionFlows.values()) {
+            AirFlow flow = route.get(packedPos);
+            if (flow != null) {
+                total += flow.temperature;
+                sources++;
+            }
+        }
+        return sources == 0 ? fallback : total / sources;
+    }
+
     public static synchronized double temperatureOffset(Level level, BlockPos pos, double ambient) {
-        Map<Long, Map<Long, AirFlow>> dimensionFlows = SOURCES.get(level.dimension());
+        Map<Long, Map<Long, AirFlow>> dimensionFlows = SOURCES.get(worldKey(level));
         if (dimensionFlows == null) return 0.0;
 
         double offset = 0.0;
@@ -68,5 +85,14 @@ public final class VentilationService {
         }
     }
 
+    public static synchronized void clear(Level level) {
+        SOURCES.remove(worldKey(level));
+    }
+
+    private static WorldKey worldKey(Level level) {
+        return new WorldKey(level.dimension(), level.isClientSide);
+    }
+
+    private record WorldKey(ResourceKey<Level> dimension, boolean clientSide) {}
     private record AirFlow(double temperature, double leakage) {}
 }

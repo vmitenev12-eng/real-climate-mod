@@ -22,8 +22,8 @@ public class ControlPanelRenderer implements BlockEntityRenderer<ControlPanelBlo
     @Override
     public void render(ControlPanelBlockEntity panel, float partialTick, PoseStack pose,
                        MultiBufferSource buffer, int packedLight, int packedOverlay) {
-        Direction facing = panel.getBlockState().getValue(ControlPanelBlock.FACING);
-        String text = String.format(java.util.Locale.ROOT, "%.1f C", panel.getTargetTemp());
+        Direction facing = com.realclimate.block.FacingBlock.indexToDirection(panel.getBlockState().getValue(ControlPanelBlock.FACING));
+        String text = String.format(java.util.Locale.ROOT, "%.1f°C", panel.getTargetTemp());
 
         pose.pushPose();
         double centerX = 0.5;
@@ -48,7 +48,7 @@ public class ControlPanelRenderer implements BlockEntityRenderer<ControlPanelBlo
             }
         }
 
-        pose.scale(0.008f, -0.008f, 0.008f);
+        pose.scale(0.024f, -0.024f, 0.024f);
         float width = font.width(text);
         font.drawInBatch(Component.literal(text), -width / 2.0f, 0.0f, 0xFFFFFFFF,
                 false, pose.last().pose(), buffer, Font.DisplayMode.POLYGON_OFFSET,

@@ -11,7 +11,7 @@ import net.minecraft.world.InteractionResult;
 import net.minecraft.world.level.block.Rotation;
 import net.minecraft.world.level.block.state.properties.Property;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.block.state.properties.DirectionProperty;
+import net.minecraft.world.level.block.state.properties.IntegerProperty;
 
 public class HammerItem extends Item {
     public HammerItem(Properties props) { super(props); }
@@ -32,9 +32,10 @@ public class HammerItem extends Item {
         }
 
         for (Property<?> property : state.getProperties()) {
-            if (property instanceof DirectionProperty) {
-                BlockState rotated = state.setValue((DirectionProperty) property,
-                        state.getValue((DirectionProperty) property).getClockWise());
+            if (property instanceof IntegerProperty integerProperty && property.getName().equals("facing")
+                    && integerProperty.getPossibleValues().size() == 4) {
+                int value = state.getValue(integerProperty);
+                BlockState rotated = state.setValue(integerProperty, (value + 1) % 4);
                 level.setBlock(context.getClickedPos(), rotated, 3);
                 return InteractionResult.CONSUME;
             }

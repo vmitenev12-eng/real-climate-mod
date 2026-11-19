@@ -29,7 +29,7 @@ public class ACIndoorBlock extends FacingBlock {
 
     public ACIndoorBlock(Properties props) {
         super(props, SHAPE);
-        registerDefaultState(stateDefinition.any().setValue(FACING, net.minecraft.core.Direction.NORTH).setValue(ACTIVE, false));
+        registerDefaultState(stateDefinition.any().setValue(FACING, 0).setValue(ACTIVE, false));
     }
 
     @Override
@@ -39,18 +39,12 @@ public class ACIndoorBlock extends FacingBlock {
 
     @Override
     public BlockState getStateForPlacement(BlockPlaceContext c) {
-        return defaultBlockState().setValue(FACING, c.getHorizontalDirection().getOpposite()).setValue(ACTIVE, false);
+        return defaultBlockState().setValue(FACING, directionToIndex(c.getHorizontalDirection().getOpposite())).setValue(ACTIVE, false);
     }
 
     @Override
-    public BlockState rotate(BlockState s, Rotation r) { return s.setValue(FACING, r.rotate(s.getValue(FACING))); }
-
-    @Override
-    public BlockState mirror(BlockState s, Mirror m) { return s.rotate(m.getRotation(s.getValue(FACING))); }
-
-    @Override
     public VoxelShape getShape(BlockState s, BlockGetter g, BlockPos p, CollisionContext c) {
-        return rotateShape(SHAPE, s.getValue(FACING));
+        return rotateShape(SHAPE, indexToDirection(s.getValue(FACING)));
     }
 
     @Override

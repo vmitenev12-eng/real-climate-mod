@@ -17,6 +17,9 @@ import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.block.Mirror;
 import net.minecraft.world.level.block.Rotation;
 import net.minecraft.tags.BlockTags;
+import net.minecraft.world.level.block.entity.BlockEntityTicker;
+import net.minecraft.world.level.block.entity.BlockEntityType;
+import com.realclimate.registry.ModBlockEntities;
 
 public class VentBlock extends FacingBlock {
     public static final BooleanProperty SEALED = BooleanProperty.create("sealed");
@@ -48,6 +51,14 @@ public class VentBlock extends FacingBlock {
 
     @Override
     public BlockEntity newBlockEntity(BlockPos p, BlockState st) { return new VentBlockEntity(p, st); }
+
+    @Override
+    public <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level level, BlockState state, BlockEntityType<T> type) {
+        if (level.isClientSide) return null;
+        return type == ModBlockEntities.VENT.get()
+                ? (level1, pos, state1, be) -> VentBlockEntity.serverTick(level1, pos, state1, (VentBlockEntity) be)
+                : null;
+    }
 
     public static boolean isVent(BlockGetter g, BlockPos p) {
         return g.getBlockState(p).getBlock() instanceof VentBlock || g.getBlockState(p).getBlock() instanceof GrilleBlock;

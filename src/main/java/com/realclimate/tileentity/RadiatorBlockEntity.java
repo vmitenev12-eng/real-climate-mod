@@ -10,6 +10,7 @@ import net.minecraft.world.level.Level;
 
 public class RadiatorBlockEntity extends BlockEntity {
     private boolean enabled = true;
+    private double targetTemp = 22.0;
     private double heatBuffer = 0.0;
 
     public RadiatorBlockEntity(BlockPos pos, BlockState state) {
@@ -18,6 +19,8 @@ public class RadiatorBlockEntity extends BlockEntity {
 
     public boolean isEnabled() { return enabled; }
     public void setEnabled(boolean e) { this.enabled = e; setChanged(); }
+    public double getTargetTemp() { return targetTemp; }
+    public void setTargetTemp(double t) { this.targetTemp = Math.max(-20.0, Math.min(95.0, t)); setChanged(); }
     public double getHeatBuffer() { return heatBuffer; }
     public void addHeat(double h) { this.heatBuffer += h; }
 
@@ -25,12 +28,14 @@ public class RadiatorBlockEntity extends BlockEntity {
     public void saveAdditional(CompoundTag tag) {
         super.saveAdditional(tag);
         tag.putBoolean("Enabled", enabled);
+        tag.putDouble("TargetTemp", targetTemp);
     }
 
     @Override
     public void load(CompoundTag tag) {
         super.load(tag);
         enabled = tag.getBoolean("Enabled");
+        targetTemp = Math.max(-20.0, Math.min(95.0, tag.getDouble("TargetTemp")));
     }
 
     public static void serverTick(Level level, BlockPos pos, BlockState state, RadiatorBlockEntity be) {

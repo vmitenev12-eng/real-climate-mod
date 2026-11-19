@@ -9,6 +9,10 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.PacketFlow;
+import net.minecraft.network.protocol.game.ClientGamePacketListener;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -24,9 +28,14 @@ public class ACOutdoorBlockEntity extends BlockEntity {
 
     public void setLinkedIndoors(Set<BlockPos> indoors) { this.linkedIndoors.clear(); this.linkedIndoors.addAll(indoors); }
     public Set<BlockPos> getLinkedIndoors() { return linkedIndoors; }
-    public boolean linkIndoor(BlockPos pos) { return linkedIndoors.add(pos); }
-    public void unlinkIndoor(BlockPos pos) { linkedIndoors.remove(pos); }
-    public void unlinkAll() { linkedIndoors.clear(); }
+    public boolean linkIndoor(BlockPos pos) {
+        if (linkedIndoors.size() >= 3 && !linkedIndoors.contains(pos)) return false;
+        boolean changed = linkedIndoors.add(pos);
+        if (changed) setChanged();
+        return changed;
+    }
+    public void unlinkIndoor(BlockPos pos) { if (linkedIndoors.remove(pos)) setChanged(); }
+    public void unlinkAll() { if (!linkedIndoors.isEmpty()) { linkedIndoors.clear(); setChanged(); } }
 
     public boolean isEnabled() { return enabled; }
     public void setEnabled(boolean e) { this.enabled = e; setChanged(); }
@@ -44,6 +53,18 @@ public class ACOutdoorBlockEntity extends BlockEntity {
             linked.putString("I" + i++, p.getX() + "," + p.getY() + "," + p.getZ());
         }
         tag.put("Linked", linked);
+    }
+
+    @Override
+    public CompoundTag getUpdateTag() {
+        CompoundTag tag = new CompoundTag();
+        saveAdditional(tag);
+        return tag;
+    }
+
+    @Override
+    public Packet<ClientGamePacketListener> getUpdatePacket() {
+        return ClientboundBlockEntityDataPacket.create(this);
     }
 
     @Override
@@ -65,14 +86,15 @@ public class ACOutdoorBlockEntity extends BlockEntity {
 
     public static void serverTick(Level level, BlockPos pos, BlockState state, ACOutdoorBlockEntity be) {
         if (!be.isEnabled()) return;
-        double outside = ClimateService.temperature(pos.getX(), pos.getZ(), 1.0);
+        double outside = ClimateService.getTemperature(level, pos);
         double cooling = (outside - be.getTargetTemp()) * 0.5;
-        if (Math.abs(cooling) > 0.5) {
+        if (Math.abs(cooling) > 0.5 && !be.linkedIndoors.isEmpty()) {
+            double splitCooling = cooling / be.linkedIndoors.size();
             for (BlockPos ip : be.linkedIndoors) {
                 if (level.isLoaded(ip)) {
                     BlockEntity ibe = level.getBlockEntity(ip);
                     if (ibe instanceof ACIndoorBlockEntity indoor) {
-                        indoor.addCool(cooling * 0.3);
+                        indoor.addCool(splitCooling * 0.3);
                     }
                 }
             }

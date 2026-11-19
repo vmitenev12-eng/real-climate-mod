@@ -15,6 +15,10 @@ import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.block.Mirror;
 import net.minecraft.world.level.block.Rotation;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.entity.BlockEntityTicker;
+import net.minecraft.world.level.block.entity.BlockEntityType;
+import com.realclimate.registry.ModBlockEntities;
 
 public class ACIndoorBlock extends FacingBlock {
     public static final BooleanProperty ACTIVE = BooleanProperty.create("active");
@@ -46,4 +50,12 @@ public class ACIndoorBlock extends FacingBlock {
 
     @Override
     public BlockEntity newBlockEntity(BlockPos p, BlockState st) { return new ACIndoorBlockEntity(p, st); }
+
+    @Override
+    public <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level level, BlockState state, BlockEntityType<T> type) {
+        if (level.isClientSide) return null;
+        return type == ModBlockEntities.AC_INDOOR.get()
+                ? (level1, pos, state1, be) -> ACIndoorBlockEntity.serverTick(level1, pos, state1, (ACIndoorBlockEntity) be)
+                : null;
+    }
 }

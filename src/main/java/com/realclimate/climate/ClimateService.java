@@ -12,6 +12,7 @@ import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.time.LocalDate;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -40,7 +41,15 @@ public final class ClimateService {
     }
 
     public static double temperature(double x, double z, double height) {
-        return ClimateConfig.BASE_TEMP.get() + Math.sin(x / 500.0) * 5.0 + Math.cos(z / 500.0) * 3.0;
+        double metersPerBlock = Math.max(1.0, ClimateConfig.scale());
+        double lat = Geo.latitude(z, metersPerBlock);
+        double lon = Geo.longitude(x, metersPerBlock);
+        int hour = (int) ((System.currentTimeMillis() / 3_600_000L) % 24);
+        double temp = ClimateModel.dailyMean(lat, LocalDate.now())
+                + ClimateModel.diurnal(lat, hour);
+        temp -= Math.max(0.0, height - 64.0) * 0.0065;
+        temp += Math.sin(Math.toRadians(lon * 0.37)) * 1.2;
+        return temp;
     }
 
     public static double humidity(double x, double z) {
@@ -48,7 +57,14 @@ public final class ClimateService {
     }
 
     public static double getTemperature(Level level, BlockPos pos) {
-        return temperature(pos.getX(), pos.getZ(), pos.getY());
+        double temp = temperature(pos.getX(), pos.getZ(), pos.getY());
+        if (level.isRaining()) temp -= level.isThundering() ? 5.0 : 3.0;
+        if (level.isThundering()) temp -= 1.5;
+        long dayTime = level.getDayTime() % 24000L;
+        double localHours = dayTime / 1000.0;
+        temp += ClimateModel.diurnal(Geo.latitude(pos.getZ(), ClimateConfig.scale()), (int) localHours)
+                - ClimateModel.diurnal(Geo.latitude(pos.getZ(), ClimateConfig.scale()), 12);
+        return temp;
     }
 
     public static double getHumidity(Level level, BlockPos pos) {

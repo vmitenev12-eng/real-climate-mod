@@ -15,6 +15,10 @@ import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.block.Mirror;
 import net.minecraft.world.level.block.Rotation;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.entity.BlockEntityTicker;
+import net.minecraft.world.level.block.entity.BlockEntityType;
+import com.realclimate.registry.ModBlockEntities;
 
 public class GrilleBlock extends FacingBlock {
     public static final BooleanProperty OPEN = BooleanProperty.create("open");
@@ -46,4 +50,12 @@ public class GrilleBlock extends FacingBlock {
 
     @Override
     public BlockEntity newBlockEntity(BlockPos p, BlockState st) { return new GrilleBlockEntity(p, st); }
+
+    @Override
+    public <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level level, BlockState state, BlockEntityType<T> type) {
+        if (level.isClientSide) return null;
+        return type == ModBlockEntities.GRILLE.get()
+                ? (level1, pos, state1, be) -> GrilleBlockEntity.serverTick(level1, pos, state1, (GrilleBlockEntity) be)
+                : null;
+    }
 }

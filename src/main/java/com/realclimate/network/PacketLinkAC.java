@@ -11,23 +11,34 @@ import java.util.function.Supplier;
 
 public class PacketLinkAC {
     private final BlockPos outdoor;
-    private final int indoorHash;
+    private final BlockPos indoor;
+    private final boolean add;
     private final boolean unlinkAll;
 
-    public PacketLinkAC(BlockPos outdoor, int indoorHash, boolean unlinkAll) {
+    public PacketLinkAC(BlockPos outdoor, BlockPos indoor, boolean add, boolean unlinkAll) {
         this.outdoor = outdoor;
-        this.indoorHash = indoorHash;
+        this.indoor = indoor;
+        this.add = add;
         this.unlinkAll = unlinkAll;
+    }
+
+    public static PacketLinkAC unlinkOne(BlockPos outdoor, BlockPos indoor) {
+        return new PacketLinkAC(outdoor, indoor, false, false);
+    }
+
+    public static PacketLinkAC unlinkAll(BlockPos outdoor) {
+        return new PacketLinkAC(outdoor, BlockPos.ZERO, false, true);
     }
 
     public static void encode(PacketLinkAC msg, FriendlyByteBuf buf) {
         buf.writeBlockPos(msg.outdoor);
-        buf.writeInt(msg.indoorHash);
+        buf.writeBlockPos(msg.indoor);
+        buf.writeBoolean(msg.add);
         buf.writeBoolean(msg.unlinkAll);
     }
 
     public static PacketLinkAC decode(FriendlyByteBuf buf) {
-        return new PacketLinkAC(buf.readBlockPos(), buf.readInt(), buf.readBoolean());
+        return new PacketLinkAC(buf.readBlockPos(), buf.readBlockPos(), buf.readBoolean(), buf.readBoolean());
     }
 
     public static void handle(PacketLinkAC msg, Supplier<NetworkEvent.Context> ctx) {
@@ -39,17 +50,15 @@ public class PacketLinkAC {
             if (be instanceof ACOutdoorBlockEntity outdoor) {
                 if (msg.unlinkAll) {
                     outdoor.unlinkAll();
-                } else {
-                    for (net.minecraft.core.BlockPos ip : new java.util.ArrayList<>(outdoor.getLinkedIndoors())) {
-                        net.minecraft.world.level.block.entity.BlockEntity ibe = level.getBlockEntity(ip);
-                        if (ibe instanceof ACIndoorBlockEntity indoor) {
-                            if (indoor.hashCode() == msg.indoorHash) {
-                                outdoor.unlinkIndoor(ip);
-                                indoor.setLinkedOutdoor(null);
-                                break;
-                            }
-                        }
+                } else if (msg.add) {
+                    if (outdoor.linkIndoor(msg.indoor)) {
+                        net.minecraft.world.level.block.entity.BlockEntity ibe = level.getBlockEntity(msg.indoor);
+                        if (ibe instanceof ACIndoorBlockEntity indoor) indoor.setLinkedOutdoor(msg.outdoor);
                     }
+                } else {
+                    outdoor.unlinkIndoor(msg.indoor);
+                    net.minecraft.world.level.block.entity.BlockEntity ibe = level.getBlockEntity(msg.indoor);
+                    if (ibe instanceof ACIndoorBlockEntity indoor) indoor.setLinkedOutdoor(null);
                 }
             }
         });

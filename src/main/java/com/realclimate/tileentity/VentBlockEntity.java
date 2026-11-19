@@ -7,8 +7,10 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.material.FluidState;
-import net.minecraft.world.level.material.Fluids;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import com.realclimate.block.GrilleBlock;
+import com.realclimate.block.ACOutdoorBlock;
+import com.realclimate.climate.MiniBlockIntegration;
 
 import java.util.*;
 
@@ -26,7 +28,8 @@ public class VentBlockEntity extends BlockEntity {
     public int getRoomId() { return roomId; }
     public void setRoomId(int id) { this.roomId = id; setChanged(); }
     public double getTempBuffer() { return tempBuffer; }
-    public void addTemp(double t) { this.tempBuffer += t; }
+    public void setTempBuffer(double t) { this.tempBuffer = t; setChanged(); }
+    public void addTemp(double t) { this.tempBuffer += t; setChanged(); }
 
     @Override
     public void saveAdditional(CompoundTag tag) {
@@ -43,10 +46,35 @@ public class VentBlockEntity extends BlockEntity {
     }
 
     public static void serverTick(Level level, BlockPos pos, BlockState state, VentBlockEntity be) {
-        if (!level.isClientSide && level.getGameTime() % 20 == 0) {
-            FluidState fs = level.getFluidState(pos);
-            boolean waterlogged = fs.getType() == Fluids.WATER;
-            level.setBlock(pos, state.setValue(VentBlock.SEALED, waterlogged), 3);
+        if (level.isClientSide || level.getGameTime() % 20 != 0) return;
+
+        boolean sealed = true;
+        double loss = 0.0;
+        for (net.minecraft.core.Direction direction : net.minecraft.core.Direction.Plane.HORIZONTAL) {
+            BlockPos neighborPos = pos.relative(direction);
+            BlockState neighbor = level.getBlockState(neighborPos);
+            boolean validVentConnection = neighbor.getBlock() instanceof VentBlock
+                    || neighbor.getBlock() instanceof GrilleBlock
+                    || neighbor.getBlock() instanceof ACOutdoorBlock
+                    || neighbor.isAir();
+
+            if (!validVentConnection) {
+                double gap = MiniBlockIntegration.openGapRatio(level, neighborPos, direction);
+                if (gap > 0.0) {
+                    sealed = false;
+                    loss = Math.max(loss, gap);
+                }
+            }
+            if (neighbor.isAir()) {
+                sealed = false;
+                loss = Math.max(loss, 1.0);
+            }
+        }
+
+        be.setSealed(sealed);
+        be.setTempBuffer(loss);
+        if (state.hasProperty(VentBlock.SEALED)) {
+            level.setBlock(pos, state.setValue(VentBlock.SEALED, sealed), 3);
         }
     }
 }

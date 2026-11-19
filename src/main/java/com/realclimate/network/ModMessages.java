@@ -21,6 +21,11 @@ public final class ModMessages {
                 .decoder(PacketLinkAC::decode)
                 .consumerMainThread(PacketLinkAC::handle)
                 .add();
+        INSTANCE.messageBuilder(PacketClimateSettings.class, id++, NetworkDirection.PLAY_TO_SERVER)
+                .encoder(PacketClimateSettings::encode)
+                .decoder(PacketClimateSettings::decode)
+                .consumerMainThread(PacketClimateSettings::handle)
+                .add();
     }
 
     public static SimpleChannel get() { return INSTANCE; }

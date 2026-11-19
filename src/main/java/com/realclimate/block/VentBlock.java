@@ -23,7 +23,11 @@ import com.realclimate.registry.ModBlockEntities;
 
 public class VentBlock extends FacingBlock {
     public static final BooleanProperty SEALED = BooleanProperty.create("sealed");
-    protected static final VoxelShape SHAPE = Shapes.box(0.25, 0.0, 0.25, 0.75, 1.0, 0.75);
+        protected static final VoxelShape SHAPE = Shapes.or(
+            Shapes.box(0.0, 0.0, 0.0, 1.0, 1.0 / 16.0, 1.0),
+            Shapes.box(0.0, 15.0 / 16.0, 0.0, 1.0, 1.0, 1.0),
+            Shapes.box(0.0, 1.0 / 16.0, 0.0, 1.0 / 16.0, 15.0 / 16.0, 1.0),
+            Shapes.box(15.0 / 16.0, 1.0 / 16.0, 0.0, 1.0, 15.0 / 16.0, 1.0));
 
     public VentBlock(Properties props) {
         super(props, SHAPE);
@@ -47,7 +51,9 @@ public class VentBlock extends FacingBlock {
     public BlockState mirror(BlockState s, Mirror m) { return s.rotate(m.getRotation(s.getValue(FACING))); }
 
     @Override
-    public VoxelShape getShape(BlockState s, BlockGetter g, BlockPos p, CollisionContext c) { return SHAPE; }
+    public VoxelShape getShape(BlockState s, BlockGetter g, BlockPos p, CollisionContext c) {
+        return rotateShape(SHAPE, s.getValue(FACING));
+    }
 
     @Override
     public BlockEntity newBlockEntity(BlockPos p, BlockState st) { return new VentBlockEntity(p, st); }

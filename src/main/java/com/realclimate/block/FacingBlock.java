@@ -17,13 +17,18 @@ import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.VoxelShape;
 import net.minecraft.world.phys.shapes.Shapes;
+import net.minecraft.world.phys.AABB;
 
 public class FacingBlock extends Block implements EntityBlock {
     public static final DirectionProperty FACING = BlockStateProperties.HORIZONTAL_FACING;
     protected final VoxelShape shape;
 
     public FacingBlock(Properties props) {
-        this(props, Shapes.box(0.25, 0.25, 0.25, 0.75, 0.75, 0.75));
+        this(props, Shapes.or(
+            Shapes.box(0.0, 0.0, 0.0, 1.0, 1.0 / 16.0, 1.0),
+            Shapes.box(0.0, 15.0 / 16.0, 0.0, 1.0, 1.0, 1.0),
+            Shapes.box(0.0, 1.0 / 16.0, 0.0, 1.0 / 16.0, 15.0 / 16.0, 1.0),
+            Shapes.box(15.0 / 16.0, 1.0 / 16.0, 0.0, 1.0, 15.0 / 16.0, 1.0)));
     }
 
     public FacingBlock(Properties props, VoxelShape shape) {
@@ -48,11 +53,36 @@ public class FacingBlock extends Block implements EntityBlock {
     public BlockState mirror(BlockState s, Mirror m) { return s.rotate(m.getRotation(s.getValue(FACING))); }
 
     @Override
-    public VoxelShape getShape(BlockState s, BlockGetter g, BlockPos p, CollisionContext c) { return shape; }
+    public VoxelShape getShape(BlockState s, BlockGetter g, BlockPos p, CollisionContext c) {
+        return rotateShape(shape, s.getValue(FACING));
+    }
 
     @Override
     public VoxelShape getCollisionShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {
-        return shape;
+        return rotateShape(shape, state.getValue(FACING));
+    }
+
+    public static VoxelShape rotateShape(VoxelShape shape, Direction facing) {
+        if (facing == Direction.NORTH) return shape;
+        VoxelShape rotated = Shapes.empty();
+        for (AABB box : shape.toAabbs()) {
+            double minX = box.minX;
+            double maxX = box.maxX;
+            double minZ = box.minZ;
+            double maxZ = box.maxZ;
+            double x1;
+            double x2;
+            double z1;
+            double z2;
+            switch (facing) {
+                case EAST -> { x1 = 1.0 - maxZ; x2 = 1.0 - minZ; z1 = minX; z2 = maxX; }
+                case SOUTH -> { x1 = 1.0 - maxX; x2 = 1.0 - minX; z1 = 1.0 - maxZ; z2 = 1.0 - minZ; }
+                case WEST -> { x1 = minZ; x2 = maxZ; z1 = 1.0 - maxX; z2 = 1.0 - minX; }
+                default -> { x1 = minX; x2 = maxX; z1 = minZ; z2 = maxZ; }
+            }
+            rotated = Shapes.or(rotated, Shapes.box(x1, box.minY, z1, x2, box.maxY, z2));
+        }
+        return rotated;
     }
 
     @Override

@@ -26,7 +26,17 @@ import com.realclimate.registry.ModBlockEntities;
 
 public class RadiatorBlock extends FacingBlock {
     public static final BooleanProperty ACTIVE = BooleanProperty.create("active");
-    protected static final VoxelShape SHAPE = Shapes.box(0.12, 0.04, 0.28, 0.88, 0.92, 0.72);
+    protected static final VoxelShape SHAPE = Shapes.or(
+            Shapes.box(1.0 / 16.0, 1.0 / 16.0, 12.0 / 16.0, 3.0 / 16.0, 15.0 / 16.0, 15.0 / 16.0),
+            Shapes.box(4.0 / 16.0, 1.0 / 16.0, 12.0 / 16.0, 6.0 / 16.0, 15.0 / 16.0, 15.0 / 16.0),
+            Shapes.box(7.0 / 16.0, 1.0 / 16.0, 12.0 / 16.0, 9.0 / 16.0, 15.0 / 16.0, 15.0 / 16.0),
+            Shapes.box(10.0 / 16.0, 1.0 / 16.0, 12.0 / 16.0, 12.0 / 16.0, 15.0 / 16.0, 15.0 / 16.0),
+            Shapes.box(13.0 / 16.0, 1.0 / 16.0, 12.0 / 16.0, 15.0 / 16.0, 15.0 / 16.0, 15.0 / 16.0),
+            Shapes.box(1.0 / 16.0, 12.0 / 16.0, 13.0 / 16.0, 15.0 / 16.0, 13.0 / 16.0, 14.0 / 16.0),
+            Shapes.box(1.0 / 16.0, 3.0 / 16.0, 13.0 / 16.0, 15.0 / 16.0, 4.0 / 16.0, 14.0 / 16.0),
+            Shapes.box(14.0 / 16.0, 11.0 / 16.0, 11.0 / 16.0, 1.0, 14.0 / 16.0, 13.0 / 16.0),
+            Shapes.box(15.0 / 16.0, 11.0 / 16.0, 10.0 / 16.0, 1.0, 14.0 / 16.0, 11.0 / 16.0),
+            Shapes.box(14.0 / 16.0, 11.0 / 16.0, 10.0 / 16.0, 15.0 / 16.0, 14.0 / 16.0, 11.0 / 16.0));
 
     public RadiatorBlock(Properties props) {
         super(props, SHAPE);
@@ -50,7 +60,9 @@ public class RadiatorBlock extends FacingBlock {
     public BlockState mirror(BlockState s, Mirror m) { return s.rotate(m.getRotation(s.getValue(FACING))); }
 
     @Override
-    public VoxelShape getShape(BlockState s, BlockGetter g, BlockPos p, CollisionContext c) { return SHAPE; }
+    public VoxelShape getShape(BlockState s, BlockGetter g, BlockPos p, CollisionContext c) {
+        return rotateShape(SHAPE, s.getValue(FACING));
+    }
 
     @Override
     public InteractionResult use(BlockState state, Level level, BlockPos pos, Player player,

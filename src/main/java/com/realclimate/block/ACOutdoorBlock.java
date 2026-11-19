@@ -26,7 +26,33 @@ import com.realclimate.registry.ModBlockEntities;
 
 public class ACOutdoorBlock extends FacingBlock {
     public static final BooleanProperty CONNECTED = BooleanProperty.create("connected");
-    protected static final VoxelShape SHAPE = Shapes.box(0.08, 0.08, 0.08, 0.92, 0.92, 0.92);
+        protected static final VoxelShape SHAPE = createModelShape();
+
+        private static VoxelShape createModelShape() {
+            double[][] parts = {
+                    {16, 2, 7, 16, 16, 16}, {0, 2, 7, 0, 16, 16}, {0, 2, 16, 16, 16, 16},
+                    {0, 2, 11, 16, 16, 11}, {0, 2, 7, 16, 2, 16}, {0, 16, 7, 16, 16, 16},
+                    {11, 15, 3, 11, 16, 3}, {12, 14, 7, 16, 16, 7}, {12, 11, 7, 16, 13, 7},
+                    {12, 8, 7, 16, 10, 7}, {12, 5, 7, 16, 7, 7}, {12, 2, 7, 16, 4, 7},
+                    {0, 15, 7, 12, 16, 7}, {0, 3, 7, 1, 15, 7}, {12, 4, 7, 13, 14, 7},
+                    {15, 4, 7, 16, 14, 7}, {0, 2, 7, 12, 3, 7}, {1, 3, 6, 2, 15, 7},
+                    {3, 3, 6, 4, 15, 7}, {5, 3, 6, 6, 15, 7}, {7, 3, 6, 8, 15, 7},
+                    {9, 3, 6, 10, 15, 7}, {11, 3, 6, 12, 15, 7}, {1, 14, 6, 12, 15, 7},
+                    {1, 3, 6, 12, 4, 7}, {4.5, 7.5, 8, 6.5, 9.5, 9}, {4.5, 7.5, 9, 6.5, 9.5, 15},
+                    {5, 4.5, 8.3, 6, 13.5, 8.7}, {1.5, 8, 8.3, 10, 9, 8.7}
+            };
+            VoxelShape shape = Shapes.empty();
+            for (double[] part : parts) {
+                double minX = part[0], minY = part[1], minZ = part[2];
+                double maxX = part[3], maxY = part[4], maxZ = part[5];
+                if (minX == maxX) { minX = Math.max(0, minX - 0.5); maxX = Math.min(16, maxX + 0.5); }
+                if (minY == maxY) { minY = Math.max(0, minY - 0.5); maxY = Math.min(16, maxY + 0.5); }
+                if (minZ == maxZ) { minZ = Math.max(0, minZ - 0.5); maxZ = Math.min(16, maxZ + 0.5); }
+                shape = Shapes.or(shape, Shapes.box(minX / 16.0, minY / 16.0, minZ / 16.0,
+                        maxX / 16.0, maxY / 16.0, maxZ / 16.0));
+            }
+            return shape;
+        }
 
     public ACOutdoorBlock(Properties props) {
         super(props, SHAPE);
@@ -50,7 +76,9 @@ public class ACOutdoorBlock extends FacingBlock {
     public BlockState mirror(BlockState s, Mirror m) { return s.rotate(m.getRotation(s.getValue(FACING))); }
 
     @Override
-    public VoxelShape getShape(BlockState s, BlockGetter g, BlockPos p, CollisionContext c) { return SHAPE; }
+    public VoxelShape getShape(BlockState s, BlockGetter g, BlockPos p, CollisionContext c) {
+        return rotateShape(SHAPE, s.getValue(FACING));
+    }
 
     @Override
     public BlockEntity newBlockEntity(BlockPos p, BlockState st) { return new ACOutdoorBlockEntity(p, st); }

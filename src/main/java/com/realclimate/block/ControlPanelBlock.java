@@ -26,7 +26,10 @@ import net.minecraft.world.phys.shapes.VoxelShape;
 
 public class ControlPanelBlock extends Block implements EntityBlock {
     public static final DirectionProperty FACING = BlockStateProperties.HORIZONTAL_FACING;
-    private static final VoxelShape SHAPE = Shapes.box(0.1, 0.15, 0.05, 0.9, 0.85, 0.95);
+            private static final VoxelShape SHAPE = Shapes.or(
+                Shapes.box(2.0 / 16.0, 3.0 / 16.0, 13.0 / 16.0, 14.0 / 16.0, 13.0 / 16.0, 15.0 / 16.0),
+                Shapes.box(5.0 / 16.0, 6.0 / 16.0, 12.0 / 16.0, 11.0 / 16.0, 8.0 / 16.0, 13.0 / 16.0),
+                Shapes.box(7.0 / 16.0, 8.0 / 16.0, 12.0 / 16.0, 9.0 / 16.0, 10.0 / 16.0, 13.0 / 16.0));
 
     public ControlPanelBlock(BlockBehaviour.Properties properties) {
         super(properties);
@@ -55,13 +58,13 @@ public class ControlPanelBlock extends Block implements EntityBlock {
 
     @Override
     public VoxelShape getShape(BlockState state, net.minecraft.world.level.BlockGetter level, BlockPos pos, CollisionContext context) {
-        return SHAPE;
+        return FacingBlock.rotateShape(SHAPE, state.getValue(FACING));
     }
 
     @Override
     public VoxelShape getCollisionShape(BlockState state, net.minecraft.world.level.BlockGetter level,
                                         BlockPos pos, CollisionContext context) {
-        return SHAPE;
+        return FacingBlock.rotateShape(SHAPE, state.getValue(FACING));
     }
 
     @Override

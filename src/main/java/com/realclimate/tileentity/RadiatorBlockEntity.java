@@ -8,6 +8,9 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.Level;
 import com.realclimate.climate.ClimateService;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
+import net.minecraft.network.protocol.game.ClientGamePacketListener;
 
 public class RadiatorBlockEntity extends BlockEntity {
     private boolean enabled = true;
@@ -19,9 +22,12 @@ public class RadiatorBlockEntity extends BlockEntity {
     }
 
     public boolean isEnabled() { return enabled; }
-    public void setEnabled(boolean e) { this.enabled = e; setChanged(); }
+    public void setEnabled(boolean e) { if (enabled != e) { enabled = e; setChanged(); } }
     public double getTargetTemp() { return targetTemp; }
-    public void setTargetTemp(double t) { this.targetTemp = Math.max(20.0, Math.min(90.0, t)); setChanged(); }
+    public void setTargetTemp(double t) {
+        double clamped = Math.max(20.0, Math.min(90.0, t));
+        if (targetTemp != clamped) { targetTemp = clamped; setChanged(); }
+    }
     public double getHeatBuffer() { return heatBuffer; }
     public void addHeat(double h) { this.heatBuffer += h; }
 
@@ -37,6 +43,18 @@ public class RadiatorBlockEntity extends BlockEntity {
         super.load(tag);
         enabled = tag.getBoolean("Enabled");
         targetTemp = Math.max(20.0, Math.min(90.0, tag.getDouble("TargetTemp")));
+    }
+
+    @Override
+    public CompoundTag getUpdateTag() {
+        CompoundTag tag = new CompoundTag();
+        saveAdditional(tag);
+        return tag;
+    }
+
+    @Override
+    public Packet<ClientGamePacketListener> getUpdatePacket() {
+        return ClientboundBlockEntityDataPacket.create(this);
     }
 
     public static void serverTick(Level level, BlockPos pos, BlockState state, RadiatorBlockEntity be) {

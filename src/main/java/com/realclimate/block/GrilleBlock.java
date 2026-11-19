@@ -22,7 +22,22 @@ import com.realclimate.registry.ModBlockEntities;
 
 public class GrilleBlock extends FacingBlock {
     public static final BooleanProperty OPEN = BooleanProperty.create("open");
-    protected static final VoxelShape SHAPE = Shapes.box(0.0, 0.38, 0.0, 1.0, 0.62, 1.0);
+        protected static final VoxelShape SHAPE = createGrilleShape();
+
+        private static VoxelShape createGrilleShape() {
+            VoxelShape shape = Shapes.or(
+            Shapes.box(0.0, 0.0, 0.0, 1.0, 1.0, 1.0 / 16.0),
+            Shapes.box(0.0, 0.0, 15.0 / 16.0, 1.0, 1.0, 1.0),
+            Shapes.box(0.0, 0.0, 1.0 / 16.0, 1.0 / 16.0, 1.0, 15.0 / 16.0),
+                Shapes.box(15.0 / 16.0, 0.0, 1.0 / 16.0, 1.0, 1.0, 15.0 / 16.0));
+            for (double offset : new double[]{0.0, 2.15, 4.3, 6.45, 8.6, 10.7, 12.85, 15.0}) {
+                double min = offset / 16.0;
+                double max = Math.min(1.0, (offset + 1.0) / 16.0);
+                shape = Shapes.or(shape, Shapes.box(min, 0.0, 0.0, max, 0.5 / 16.0, 1.0));
+                shape = Shapes.or(shape, Shapes.box(0.0, 0.0, min, 1.0, 0.5 / 16.0, max));
+            }
+            return shape;
+        }
 
     public GrilleBlock(Properties props) {
         super(props, SHAPE);
@@ -46,7 +61,9 @@ public class GrilleBlock extends FacingBlock {
     public BlockState mirror(BlockState s, Mirror m) { return s.rotate(m.getRotation(s.getValue(FACING))); }
 
     @Override
-    public VoxelShape getShape(BlockState s, BlockGetter g, BlockPos p, CollisionContext c) { return SHAPE; }
+    public VoxelShape getShape(BlockState s, BlockGetter g, BlockPos p, CollisionContext c) {
+        return rotateShape(SHAPE, s.getValue(FACING));
+    }
 
     @Override
     public BlockEntity newBlockEntity(BlockPos p, BlockState st) { return new GrilleBlockEntity(p, st); }

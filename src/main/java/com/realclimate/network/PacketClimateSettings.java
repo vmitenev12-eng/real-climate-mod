@@ -68,6 +68,12 @@ public class PacketClimateSettings {
             }
             blockEntity.setChanged();
             player.serverLevel().sendBlockUpdated(message.pos, blockEntity.getBlockState(), blockEntity.getBlockState(), 3);
+                double savedTemperature = blockEntity instanceof ACOutdoorBlockEntity outdoor ? outdoor.getTargetTemp()
+                    : blockEntity instanceof RadiatorBlockEntity radiator ? radiator.getTargetTemp()
+                    : blockEntity instanceof ControlPanelBlockEntity panel ? panel.getTargetTemp()
+                    : ((ACIndoorBlockEntity) blockEntity).getTargetTemp();
+                player.displayClientMessage(net.minecraft.network.chat.Component.literal(
+                    String.format(java.util.Locale.ROOT, "Уставка сохранена: %.1f °C", savedTemperature)), true);
         });
         context.setPacketHandled(true);
     }

@@ -22,7 +22,10 @@ import com.realclimate.registry.ModBlockEntities;
 
 public class ACIndoorBlock extends FacingBlock {
     public static final BooleanProperty ACTIVE = BooleanProperty.create("active");
-    protected static final VoxelShape SHAPE = Shapes.box(0.08, 0.18, 0.18, 0.92, 0.88, 0.82);
+        protected static final VoxelShape SHAPE = Shapes.or(
+            Shapes.box(0.0, 5.0 / 16.0, 11.0 / 16.0, 1.0, 11.0 / 16.0, 1.0),
+            Shapes.box(0.0, 4.0 / 16.0, 10.0 / 16.0, 1.0, 10.0 / 16.0, 11.0 / 16.0),
+            Shapes.box(1.0 / 16.0, 3.0 / 16.0, 10.0 / 16.0, 15.0 / 16.0, 4.0 / 16.0, 13.0 / 16.0));
 
     public ACIndoorBlock(Properties props) {
         super(props, SHAPE);
@@ -46,7 +49,9 @@ public class ACIndoorBlock extends FacingBlock {
     public BlockState mirror(BlockState s, Mirror m) { return s.rotate(m.getRotation(s.getValue(FACING))); }
 
     @Override
-    public VoxelShape getShape(BlockState s, BlockGetter g, BlockPos p, CollisionContext c) { return SHAPE; }
+    public VoxelShape getShape(BlockState s, BlockGetter g, BlockPos p, CollisionContext c) {
+        return rotateShape(SHAPE, s.getValue(FACING));
+    }
 
     @Override
     public BlockEntity newBlockEntity(BlockPos p, BlockState st) { return new ACIndoorBlockEntity(p, st); }

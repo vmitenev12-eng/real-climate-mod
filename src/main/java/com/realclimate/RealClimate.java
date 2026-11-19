@@ -24,7 +24,6 @@ public class RealClimate {
         ModBlocks.ITEMS.register(bus);
         ModItems.ITEMS.register(bus);
         ModBlockEntities.BLOCK_ENTITIES.register(bus);
-        ModCreativeTab.TABS.register(bus);
 
         ModMessages.register();
 

@@ -13,6 +13,15 @@
  "block.real_climate.ac_indoor": "Air Conditioner Indoor Unit",
  "block.real_climate.ac_outdoor": "Air Conditioner Outdoor Unit",
  "block.real_climate.radiator": "Heating Radiator",
+ "block.real_climate.vent_block": "Vent Shaft",
+ "block.real_climate.grille_block": "Vent Grille",
  "itemGroup.real_climate": "Real Climate",
- "item.real_climate.hammer": "Hammer"
+ "item.real_climate.hammer": "Hammer",
+ "item.real_climate.installation_key": "Installation Key",
+ "tooltip.real_climate.link_ac": "Right-click indoor unit to link",
+ "gui.real_climate.link_title": "AC Link",
+ "gui.real_climate.link_outdoor": "Outdoor Unit",
+ "gui.real_climate.link_indoor": "Indoor Unit",
+ "gui.real_climate.link_button": "Link",
+ "gui.real_climate.unlink_button": "Unlink"
 }

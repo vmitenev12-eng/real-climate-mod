@@ -3,6 +3,7 @@ package com.realclimate.registry;
 import com.realclimate.RealClimate;
 import com.realclimate.tileentity.*;
 import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraftforge.registries.DeferredRegister;
@@ -27,7 +28,7 @@ public final class ModBlockEntities {
 
     private static <T extends BlockEntity> RegistryObject<BlockEntityType<T>> register(
             String id, BlockEntityType.BlockEntitySupplier<T> factory,
-            java.util.function.Supplier<net.minecraft.world.level.block.Block> block) {
+            RegistryObject<? extends Block> block) {
         return BLOCK_ENTITIES.register(id, () -> BlockEntityType.Builder.of(factory, block.get()).build(null));
     }
 

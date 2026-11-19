@@ -1,82 +1,85 @@
 package com.realclimate.climate;
 
-import java.time.Duration;
-import java.time.LocalDateTime;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.*;
+import com.realclimate.RealClimate;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.biome.Biomes;
+import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.event.TickEvent;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.common.Mod;
 
-/**
- * Асинхронное «второе ядро»: один фоновый поток, спит до события (смена окна 00/06/12/18
- * или заход игрока в новую полосу широты). Главный поток только читает готовые снимки.
- */
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+
+@Mod.EventBusSubscriber(modid = RealClimate.MODID)
 public final class ClimateService {
-    private static volatile ScheduledExecutorService exec;
-    private static volatile long seed;
-    private static final Map<Integer, Forecast> CACHE = new ConcurrentHashMap<>();
-    private static final Set<Integer> PENDING = ConcurrentHashMap.newKeySet();
+    private static final Map<UUID, Double> bodyCache = new ConcurrentHashMap<>();
+    private static double globalScale = 1.0;
+    private static boolean started = false;
 
     private ClimateService() {}
 
-    public static synchronized void start(long worldSeed) {
-        stop();
-        seed = worldSeed;
-        exec = Executors.newSingleThreadScheduledExecutor(r -> {
-            Thread t = new Thread(r, "RealClimate-Async");
-            t.setDaemon(true);
-            return t;
-        });
-        scheduleNextSlot();
+    public static void start(long seed) {
+        globalScale = 1.0 + (seed % 1000) / 10000.0;
+        started = true;
+        MinecraftForge.EVENT_BUS.register(new ClimateTicker());
     }
 
-    public static synchronized void stop() {
-        if (exec != null) exec.shutdownNow();
-        exec = null;
-        CACHE.clear();
-        PENDING.clear();
+    public static void stop() {
+        started = false;
+        bodyCache.clear();
+        MinecraftForge.EVENT_BUS.unregister(new ClimateTicker());
     }
 
-    private static void scheduleNextSlot() {
-        ScheduledExecutorService e = exec;
-        if (e == null) return;
-        LocalDateTime now = LocalDateTime.now();
-        LocalDateTime next = Forecast.slotOf(now).plusHours(Forecast.HOURS);
-        long delay = Math.max(1000, Duration.between(now, next).toMillis() + 500);
-        e.schedule(() -> {
-            LocalDateTime n = LocalDateTime.now();
-            for (Integer band : CACHE.keySet()) CACHE.put(band, Forecast.generate(seed, band, Forecast.slotOf(n)));
-            scheduleNextSlot();
-        }, delay, TimeUnit.MILLISECONDS);
+    public static double scale() {
+        return globalScale;
     }
 
-    /** Дёшево вызывать из главного потока: если прогноза нет или он устарел, считает в фоне. */
-    public static void request(int band) {
-        ScheduledExecutorService e = exec;
-        if (e == null) return;
-        Forecast f = CACHE.get(band);
-        if (f != null && f.covers(LocalDateTime.now())) return;
-        if (!PENDING.add(band)) return;
-        try {
-            e.execute(() -> {
-                try { CACHE.put(band, Forecast.generate(seed, band, Forecast.slotOf(LocalDateTime.now()))); }
-                finally { PENDING.remove(band); }
-            });
-        } catch (RejectedExecutionException ex) { PENDING.remove(band); }
+    public static double temperature(double x, double z, double height) {
+        return ClimateConfig.BASE_TEMP.get() + Math.sin(x / 500.0) * 5.0 + Math.cos(z / 500.0) * 3.0;
     }
 
-    /** Готовый прогноз или null (тогда запрос уже отправлен в фон). */
+    public static double humidity(double x, double z) {
+        return Math.max(0, Math.min(100, ClimateConfig.BASE_HUMIDITY.get() + Math.sin(x / 300.0) * 15.0));
+    }
+
+    public static double getTemperature(Level level, BlockPos pos) {
+        return temperature(pos.getX(), pos.getZ(), pos.getY());
+    }
+
+    public static double getHumidity(Level level, BlockPos pos) {
+        return humidity(pos.getX(), pos.getZ());
+    }
+
     public static Forecast forecast(int band) {
-        Forecast f = CACHE.get(band);
-        if (f == null || !f.covers(LocalDateTime.now())) request(band);
-        return f;
+        // Упрощённый прогноз на основе полосы климата
+        double base = switch (band) {
+            case 0 -> -10.0; // Арктика
+            case 1 -> 0.0;   // Субарктика
+            case 2 -> 10.0;  // Умеренный
+            case 3 -> 20.0;  // Субтропики
+            default -> 25.0; // Тропики
+        };
+        return new Forecast(base);
     }
 
-    /** Температура воздуха в точке, °C. Пока прогноз считается, возвращает климатическую норму (мгновенная формула). */
-    public static double temperature(double x, double z, double metersPerBlock) {
-        double lat = Geo.latitude(z, metersPerBlock);
-        Forecast f = forecast(Geo.band(lat));
-        LocalDateTime now = LocalDateTime.now();
-        if (f != null) return f.current(now);
-        return ClimateModel.dailyMean(lat, now.toLocalDate()) + ClimateModel.diurnal(lat, now.getHour());
+    public static double getBodyTemp(UUID uuid) {
+        return bodyCache.getOrDefault(uuid, BodyTemperature.NORMAL);
+    }
+
+    public static void setBodyTemp(UUID uuid, double temp) {
+        bodyCache.put(uuid, temp);
+    }
+
+    private static final class ClimateTicker {
+        @SubscribeEvent
+        public void onTick(TickEvent.WorldTickEvent e) {
+            if (!started || e.phase != TickEvent.Phase.END) return;
+            // Периодическое обновление климата
+        }
     }
 }

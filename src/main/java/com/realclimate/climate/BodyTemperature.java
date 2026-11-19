@@ -43,7 +43,7 @@ public final class BodyTemperature {
     /** Температура воздуха в точке игрока с учётом погоды, укрытия и тепла рядом. */
     public static double effectiveAmbient(Player p) {
         double scale = ClimateConfig.scale();
-        double t = ClimateService.temperature(p.getX(), p.getZ(), scale);
+        double t = ClimateService.temperature(p.getX(), p.getZ(), p.getY());
         if (Double.isNaN(t) || Double.isInfinite(t)) t = 20.0;
         Level lv = p.level();
         BlockPos pos = p.blockPosition();

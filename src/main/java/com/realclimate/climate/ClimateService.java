@@ -76,7 +76,7 @@ public final class ClimateService {
 
     private static final class ClimateTicker {
         @SubscribeEvent
-        public void onTick(TickEvent.WorldTickEvent e) {
+        public void onTick(TickEvent.LevelTickEvent e) {
             if (!started || e.phase != TickEvent.Phase.END) return;
         }
     }

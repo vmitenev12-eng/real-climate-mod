@@ -22,5 +22,4 @@ public final class Forecast {
         return temps[hourIndex];
     }
 
-    private Forecast() {}
 }

@@ -1,6 +1,7 @@
 package com.realclimate.network;
 
 import com.realclimate.RealClimate;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.network.NetworkRegistry;
 import net.minecraftforge.network.NetworkDirection;
 import net.minecraftforge.network.simple.SimpleChannel;
@@ -11,14 +12,14 @@ public final class ModMessages {
 
     public static void register() {
         INSTANCE = NetworkRegistry.newSimpleChannel(
-                RealClimate.MODID,
+                new ResourceLocation(RealClimate.MODID, "main"),
                 () -> "1.0",
                 s -> true,
                 s -> true);
         INSTANCE.messageBuilder(PacketLinkAC.class, id++, NetworkDirection.PLAY_TO_SERVER)
                 .encoder(PacketLinkAC::encode)
                 .decoder(PacketLinkAC::decode)
-                .consumer(PacketLinkAC::handle)
+                .consumerMainThread(PacketLinkAC::handle)
                 .add();
     }
 

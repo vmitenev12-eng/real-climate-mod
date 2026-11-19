@@ -21,5 +21,9 @@ public final class ClimateConfig {
         // Регистрация выполняется в RealClimate, чтобы избежать двойной регистрации
     }
 
+    public static double scale() {
+        return ClimateService.scale();
+    }
+
     private ClimateConfig() {}
 }

@@ -2,6 +2,7 @@ package com.realclimate.tileentity;
 
 import com.realclimate.block.ACOutdoorBlock;
 import com.realclimate.climate.ClimateService;
+import com.realclimate.registry.ModBlockEntities;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -40,7 +41,7 @@ public class ACOutdoorBlockEntity extends BlockEntity {
         CompoundTag linked = new CompoundTag();
         int i = 0;
         for (BlockPos p : linkedIndoors) {
-            linked.putInt("I" + i++, p.getX() + "," + p.getY() + "," + p.getZ());
+            linked.putString("I" + i++, p.getX() + "," + p.getY() + "," + p.getZ());
         }
         tag.put("Linked", linked);
     }
@@ -52,7 +53,7 @@ public class ACOutdoorBlockEntity extends BlockEntity {
         targetTemp = tag.getDouble("TargetTemp");
         linkedIndoors.clear();
         CompoundTag linked = tag.getCompound("Linked");
-        for (String key : linked.getKeys()) {
+        for (String key : linked.getAllKeys()) {
             String[] xyz = linked.getString(key).split(",");
             linkedIndoors.add(new BlockPos(Integer.parseInt(xyz[0]), Integer.parseInt(xyz[1]), Integer.parseInt(xyz[2])));
         }

@@ -1,6 +1,7 @@
 package com.realclimate.tileentity;
 
 import com.realclimate.block.ACIndoorBlock;
+import com.realclimate.registry.ModBlockEntities;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.block.entity.BlockEntity;

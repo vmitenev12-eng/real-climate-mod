@@ -5,6 +5,7 @@ import com.realclimate.RealClimate;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraftforge.client.event.RenderGuiOverlayEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -21,7 +22,7 @@ public final class KeyOverlayRenderer {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.level == null) return;
         var held = mc.player.getMainHandItem();
-        if (held.isEmpty() || !held.getItem().getRegistryName().toString().equals("real_climate:installation_key")) return;
+        if (held.isEmpty() || !BuiltInRegistries.ITEM.getKey(held.getItem()).toString().equals("real_climate:installation_key")) return;
 
         PoseStack pose = e.getGuiGraphics().pose();
         pose.pushPose();

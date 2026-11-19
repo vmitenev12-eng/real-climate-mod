@@ -17,7 +17,6 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
-import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.DirectionProperty;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.shapes.CollisionContext;
@@ -25,8 +24,8 @@ import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
 
 public class ControlPanelBlock extends Block implements EntityBlock {
-    public static final DirectionProperty FACING = BlockStateProperties.HORIZONTAL_FACING;
-            private static final VoxelShape SHAPE = Shapes.or(
+    public static final DirectionProperty FACING = DirectionProperty.create("facing", Direction.Plane.HORIZONTAL);
+    private static final VoxelShape SHAPE = Shapes.or(
                 Shapes.box(2.0 / 16.0, 3.0 / 16.0, 13.0 / 16.0, 14.0 / 16.0, 13.0 / 16.0, 15.0 / 16.0),
                 Shapes.box(5.0 / 16.0, 6.0 / 16.0, 12.0 / 16.0, 11.0 / 16.0, 8.0 / 16.0, 13.0 / 16.0),
                 Shapes.box(7.0 / 16.0, 8.0 / 16.0, 12.0 / 16.0, 9.0 / 16.0, 10.0 / 16.0, 13.0 / 16.0));

@@ -2,11 +2,11 @@ name: Build Real Climate
 
 on:
   push:
+    branches: [main, master]
   workflow_dispatch:
 
-concurrency:
-  group: build-${{ github.ref }}
-  cancel-in-progress: true
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -14,22 +14,101 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
+      - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Gradle 8.1.1
-        uses: gradle/actions/setup-gradle@v3
+      - uses: gradle/actions/setup-gradle@v3
         with:
           gradle-version: '8.1.1'
 
-      - name: Build
+      - name: Download original jar (release "base")
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p base
+          gh release download base --pattern '*.jar' --dir base
+          mv base/*.jar base/ptm2-base.jar
+          ls -l base
+
+      - name: Prepare Gradle project
+        run: |
+          mkdir -p src/main/java/com/rinventor/ptm2/fixes
+          cp PtmFixes.java src/main/java/com/rinventor/ptm2/fixes/PtmFixes.java
+          mkdir -p src/main/java/com/rinventor/ptm2/fixes/board
+          cp board/*.java src/main/java/com/rinventor/ptm2/fixes/board/
+          cat > settings.gradle <<'EOT'
+          pluginManagement {
+              repositories {
+                  gradlePluginPortal()
+                  maven { url = 'https://maven.minecraftforge.net/' }
+              }
+          }
+          rootProject.name = 'ptmfixes'
+          EOT
+          cat > build.gradle <<'EOT'
+          plugins {
+              id 'java'
+              id 'net.minecraftforge.gradle' version '[6.0,6.2)'
+          }
+          group = 'ptmfixes'
+          version = '1'
+          java.toolchain.languageVersion = JavaLanguageVersion.of(17)
+          minecraft {
+              mappings channel: 'official', version: '1.20.1'
+          }
+          repositories {
+              maven { url = 'https://maven.minecraftforge.net/' }
+          }
+          dependencies {
+              minecraft 'net.minecraftforge:forge:1.20.1-47.4.0'
+              compileOnly files('base/ptm2-base.jar')
+          }
+          tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8' }
+          jar { archiveFileName = 'fixes.jar' }
+          jar.finalizedBy('reobfJar')
+          EOT
+
+      - name: Compile fixes
         run: gradle build --no-daemon --stacktrace
 
-      - name: Upload jar
-        uses: actions/upload-artifact@v4
-        with:
-          name: real_climate-jar
-          path: build/libs/*.jar
+      - name: Patch the jar
+        run: |
+          mkdir -p tools out
+          for j in asm asm-tree; do
+            curl -fsSL -o tools/$j.jar https://repo1.maven.org/maven2/org/ow2/asm/$j/9.6/$j-9.6.jar
+          done
+          javac -cp tools/asm.jar:tools/asm-tree.jar -d tools Patcher.java
+          java -cp tools:tools/asm.jar:tools/asm-tree.jar Patcher base/ptm2-base.jar build/libs/fixes.jar out/ptm2-patched.jar
+          ls -l out
+
+      - name: Add Russian translation
+        run: |
+          if [ -f ru_ru.json ]; then
+            mkdir -p tmpjar/assets/ptm2/lang
+            cp ru_ru.json tmpjar/assets/ptm2/lang/ru_ru.json
+            (cd tmpjar && zip -u ../out/ptm2-patched.jar assets/ptm2/lang/ru_ru.json)
+            unzip -l out/ptm2-patched.jar | grep ru_ru.json
+          else
+            echo "ru_ru.json not found, skipping"
+          fi
+
+      - name: Add extra assets
+        run: |
+          if [ -f extra-assets.zip ]; then
+            mkdir -p tmpassets
+            unzip -q -o extra-assets.zip -d tmpassets
+            (cd tmpassets && zip -q -r ../out/ptm2-patched.jar assets)
+            unzip -l out/ptm2-patched.jar | grep -c "lane_board_" || true
+          else
+            echo "extra-assets.zip not found, skipping"
+          fi
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "build-${{ github.run_number }}" out/ptm2-patched.jar \
+            --title "Build ${{ github.run_number }}" \
+            --notes "Patched PTM2 build ${{ github.run_number }}"

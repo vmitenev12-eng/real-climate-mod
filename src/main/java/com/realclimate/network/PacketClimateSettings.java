@@ -57,7 +57,6 @@ public class PacketClimateSettings {
                     if (outdoorEntity instanceof ACOutdoorBlockEntity outdoor
                             && outdoor.getLinkedPanels().contains(message.pos)) {
                         outdoor.setEnabled(message.enabled);
-                        outdoor.setTargetTemp(panel.getTargetTemp());
                         for (BlockPos indoorPos : outdoor.getLinkedIndoors()) {
                             if (player.serverLevel().isLoaded(indoorPos)
                                     && player.serverLevel().getBlockEntity(indoorPos) instanceof ACIndoorBlockEntity indoor

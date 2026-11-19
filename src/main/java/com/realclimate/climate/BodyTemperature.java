@@ -124,13 +124,13 @@ public final class BodyTemperature {
                 && state.getValue(com.realclimate.block.ACIndoorBlock.ACTIVE)
                 && level.getBlockEntity(pos) instanceof com.realclimate.tileentity.ACIndoorBlockEntity indoor
                 && indoor.isEnabled()) {
-            return (indoor.getTargetTemp() - ClimateService.getTemperature(level, pos)) * 0.85;
+            return indoor.getTargetTemp() - ClimateService.getTemperature(level, pos);
         }
         if (state.getBlock() instanceof com.realclimate.block.GrilleBlock
                 && level.getBlockEntity(pos) instanceof com.realclimate.tileentity.GrilleBlockEntity grille
                 && grille.isOpen() && VentilationService.hasActiveAirflow(level, pos)) {
             double airflowTemp = VentilationService.airflowTemperature(level, pos, grille.getTargetTemp());
-            return (airflowTemp - ClimateService.getTemperature(level, pos)) * 0.8;
+            return airflowTemp - ClimateService.getTemperature(level, pos);
         }
         return 0.0;
     }

@@ -35,7 +35,7 @@ public class ACOutdoorBlockEntity extends BlockEntity {
         if (linkedIndoors.size() >= 3 && !linkedIndoors.contains(pos)) return false;
         boolean changed = linkedIndoors.add(pos);
         if (changed) setChanged();
-        return changed;
+        return true;
     }
     public void unlinkIndoor(BlockPos pos) { if (linkedIndoors.remove(pos)) setChanged(); }
     public void unlinkAll() { if (!linkedIndoors.isEmpty()) { linkedIndoors.clear(); setChanged(); } }
@@ -125,17 +125,7 @@ public class ACOutdoorBlockEntity extends BlockEntity {
             VentilationService.removeSource(level, pos);
             return;
         }
-        double target = be.getTargetTemp();
-        for (BlockPos panelPos : be.linkedPanels) {
-            if (!level.isLoaded(panelPos)) continue;
-            BlockEntity panelEntity = level.getBlockEntity(panelPos);
-                if (panelEntity instanceof ControlPanelBlockEntity panel && panel.isEnabled()
-                    && panel.getLinkedOutdoors().contains(pos)) {
-                target = panel.getTargetTemp();
-                be.setTargetTemp(target);
-                break;
-            }
-        }
+        double target = be.getOperatingTargetTemp(level);
         if (!be.linkedIndoors.isEmpty()) {
             for (BlockPos ip : be.linkedIndoors) {
                 if (level.isLoaded(ip)) {
@@ -157,7 +147,18 @@ public class ACOutdoorBlockEntity extends BlockEntity {
             VentilationService.removeSource(level, pos);
             return;
         }
-        propagateThroughVentilation(level, pos, be.getTargetTemp(), false);
+        propagateThroughVentilation(level, pos, be.getOperatingTargetTemp(level), false);
+    }
+
+    private double getOperatingTargetTemp(Level level) {
+        for (BlockPos panelPos : linkedPanels) {
+            if (!level.isLoaded(panelPos)) continue;
+            if (level.getBlockEntity(panelPos) instanceof ControlPanelBlockEntity panel
+                    && panel.isEnabled() && panel.getLinkedOutdoors().contains(worldPosition)) {
+                return panel.getTargetTemp();
+            }
+        }
+        return getTargetTemp();
     }
 
     private static void propagateThroughVentilation(Level level, BlockPos outdoorPos, double targetTemp,

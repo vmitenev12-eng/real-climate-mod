@@ -13,8 +13,6 @@ import net.minecraftforge.client.event.RenderLevelStageEvent;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.realclimate.tileentity.ACOutdoorBlockEntity;
-import com.realclimate.tileentity.ACIndoorBlockEntity;
-import com.realclimate.tileentity.ControlPanelBlockEntity;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.core.BlockPos;
 import net.minecraftforge.event.TickEvent;
@@ -24,8 +22,7 @@ import java.util.List;
 
 @Mod.EventBusSubscriber(modid = RealClimate.MODID, value = net.minecraftforge.api.distmarker.Dist.CLIENT)
 public final class KeyOverlayRenderer {
-    private static final int LINK_SCAN_RADIUS_CHUNKS = 2;
-    private static final int LINK_SCAN_INTERVAL_TICKS = 10;
+    private static final int LINK_SCAN_INTERVAL_TICKS = 20;
     private static List<LinkLine> cachedLinkLines = List.of();
     private static net.minecraft.client.multiplayer.ClientLevel cachedLevel;
     private static long lastLinkScan = Long.MIN_VALUE;
@@ -59,25 +56,21 @@ public final class KeyOverlayRenderer {
         BlockPos playerPos = mc.player.blockPosition();
         int centerChunkX = playerPos.getX() >> 4;
         int centerChunkZ = playerPos.getZ() >> 4;
-        for (int chunkX = centerChunkX - LINK_SCAN_RADIUS_CHUNKS;
-             chunkX <= centerChunkX + LINK_SCAN_RADIUS_CHUNKS; chunkX++) {
-            for (int chunkZ = centerChunkZ - LINK_SCAN_RADIUS_CHUNKS;
-                 chunkZ <= centerChunkZ + LINK_SCAN_RADIUS_CHUNKS; chunkZ++) {
+        int scanRadiusChunks = mc.options.renderDistance().get();
+        for (int chunkX = centerChunkX - scanRadiusChunks;
+             chunkX <= centerChunkX + scanRadiusChunks; chunkX++) {
+            for (int chunkZ = centerChunkZ - scanRadiusChunks;
+                 chunkZ <= centerChunkZ + scanRadiusChunks; chunkZ++) {
                 var chunk = mc.level.getChunkSource().getChunk(chunkX, chunkZ, false);
                 if (chunk == null) continue;
                 for (var blockEntity : chunk.getBlockEntities().values()) {
                     if (!(blockEntity instanceof ACOutdoorBlockEntity outdoor)) continue;
                     BlockPos from = outdoor.getBlockPos();
                     for (BlockPos indoorPos : outdoor.getLinkedIndoors()) {
-                        if (mc.level.getBlockEntity(indoorPos) instanceof ACIndoorBlockEntity) {
-                            lines.add(new LinkLine(from, indoorPos));
-                        }
+                        lines.add(new LinkLine(from, indoorPos));
                     }
                     for (BlockPos panelPos : outdoor.getLinkedPanels()) {
-                        if (mc.level.getBlockEntity(panelPos) instanceof ControlPanelBlockEntity panel
-                                && panel.getLinkedOutdoors().contains(from)) {
-                            lines.add(new LinkLine(from, panelPos));
-                        }
+                        lines.add(new LinkLine(from, panelPos));
                     }
                 }
             }

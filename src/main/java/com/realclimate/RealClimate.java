@@ -12,9 +12,6 @@ import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.config.ModConfig;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.fml.loading.FMLEnvironment;
-import net.minecraftforge.common.MinecraftForge;
 
 @Mod(RealClimate.MODID)
 public class RealClimate {
@@ -33,9 +30,7 @@ public class RealClimate {
 
         ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, ClimateConfig.SPEC);
 
-        // Клиентские события (HUD, линии ключа)
-        if (FMLEnvironment.dist == Dist.CLIENT) {
-            MinecraftForge.EVENT_BUS.register(KeyOverlayRenderer.class);
-        }
+        // Клиентские события регистрируются через @Mod.EventBusSubscriber аннотации
+        // KeyOverlayRenderer, BodyTemperature, ClimateEvents, ClimateService — самoregistrating
     }
 }

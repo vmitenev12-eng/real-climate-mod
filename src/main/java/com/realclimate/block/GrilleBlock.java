@@ -3,9 +3,7 @@ package com.realclimate.block;
 import com.realclimate.tileentity.GrilleBlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.BooleanProperty;
-import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.BlockGetter;
@@ -17,7 +15,7 @@ import net.minecraft.world.level.block.Mirror;
 import net.minecraft.world.level.block.Rotation;
 
 public class GrilleBlock extends FacingBlock {
-    public static final BooleanProperty OPEN = BlockStateProperties.POWERED;
+    public static final BooleanProperty OPEN = BooleanProperty.create("open");
     protected static final VoxelShape SHAPE = Shapes.block();
 
     public GrilleBlock(Properties props) {
@@ -46,9 +44,4 @@ public class GrilleBlock extends FacingBlock {
 
     @Override
     public BlockEntity newBlockEntity(BlockPos p, BlockState st) { return new GrilleBlockEntity(p, st); }
-
-    @Override
-    public <T extends BlockEntity> BlockEntityType<T> getBlockEntityType() {
-        return (BlockEntityType<T>) net.minecraftforge.registries.ForgeRegistries.BLOCK_ENTITY_TYPES.getValue(net.minecraft.core.Registry.BLOCK_ENTITY_TYPE.key(), net.minecraft.core.ResourceLocation.parse("real_climate:grille"));
-    }
 }

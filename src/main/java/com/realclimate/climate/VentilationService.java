@@ -28,6 +28,16 @@ public final class VentilationService {
         if (dimensionFlows.isEmpty()) SOURCES.remove(level.dimension());
     }
 
+    public static synchronized boolean hasActiveAirflow(Level level, BlockPos grillePos) {
+        Map<Long, Map<Long, AirFlow>> dimensionFlows = SOURCES.get(level.dimension());
+        if (dimensionFlows == null) return false;
+        long packedPos = grillePos.asLong();
+        for (Map<Long, AirFlow> route : dimensionFlows.values()) {
+            if (route.containsKey(packedPos)) return true;
+        }
+        return false;
+    }
+
     public static synchronized double temperatureOffset(Level level, BlockPos pos, double ambient) {
         Map<Long, Map<Long, AirFlow>> dimensionFlows = SOURCES.get(level.dimension());
         if (dimensionFlows == null) return 0.0;
@@ -49,7 +59,7 @@ public final class VentilationService {
                 }
             }
         }
-        return Math.max(-35.0, Math.min(35.0, offset));
+        return Math.max(-100.0, Math.min(100.0, offset));
     }
 
     public static void clear() {

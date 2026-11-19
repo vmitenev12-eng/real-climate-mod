@@ -123,7 +123,8 @@ public class ACOutdoorBlockEntity extends BlockEntity {
         for (BlockPos panelPos : be.linkedPanels) {
             if (!level.isLoaded(panelPos)) continue;
             BlockEntity panelEntity = level.getBlockEntity(panelPos);
-            if (panelEntity instanceof ControlPanelBlockEntity panel && panel.isEnabled()) {
+                if (panelEntity instanceof ControlPanelBlockEntity panel && panel.isEnabled()
+                    && panel.getLinkedOutdoors().contains(pos)) {
                 target = panel.getTargetTemp();
                 be.setTargetTemp(target);
                 break;
@@ -133,7 +134,7 @@ public class ACOutdoorBlockEntity extends BlockEntity {
             for (BlockPos ip : be.linkedIndoors) {
                 if (level.isLoaded(ip)) {
                     BlockEntity ibe = level.getBlockEntity(ip);
-                    if (ibe instanceof ACIndoorBlockEntity indoor) {
+                    if (ibe instanceof ACIndoorBlockEntity indoor && pos.equals(indoor.getLinkedOutdoor())) {
                         indoor.setTargetTemp(target);
                         indoor.setEnabled(true);
                     }
@@ -177,7 +178,9 @@ public class ACOutdoorBlockEntity extends BlockEntity {
                         BlockState neighbor = level.getBlockState(neighborPos);
                         if (neighbor.getBlock() instanceof ACOutdoorBlock || isDuctOrGrille(neighbor)) connected++;
                     }
-                    double loss = terminal ? 2.0 : Math.max(0.0, (expectedConnections - connected) / (double) expectedConnections);
+                        double loss = terminal
+                            ? (level.getBlockEntity(next) instanceof com.realclimate.tileentity.GrilleBlockEntity ? 0.0 : 2.0)
+                            : Math.max(0.0, (expectedConnections - connected) / (double) expectedConnections);
                     airflow.put(next.immutable(), loss);
                     if (nextState.getBlock() instanceof com.realclimate.block.VentBlock
                             && level.getBlockEntity(next) instanceof com.realclimate.tileentity.VentBlockEntity vent) {

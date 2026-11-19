@@ -53,6 +53,7 @@ public final class MiniBlockIntegration {
     public static boolean allowsAirPassage(Level level, BlockPos pos, Direction movement) {
         BlockState state = level.getBlockState(pos);
         if (state.isAir()) return true;
+        if (state.getBlock() instanceof com.realclimate.block.GrilleBlock) return true;
         Boolean open = openDoorOrWindow(state);
         if (open != null) return open;
         if (!isLikelyMiniBlock(state)) return state.getCollisionShape(level, pos).isEmpty();

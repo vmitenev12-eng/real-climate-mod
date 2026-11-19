@@ -54,9 +54,20 @@ public class PacketClimateSettings {
                 panel.setTargetTemp(clampHvac(message.targetTemperature));
                 for (BlockPos outdoorPos : panel.getLinkedOutdoors()) {
                     BlockEntity outdoorEntity = player.serverLevel().getBlockEntity(outdoorPos);
-                    if (outdoorEntity instanceof ACOutdoorBlockEntity outdoor) {
+                    if (outdoorEntity instanceof ACOutdoorBlockEntity outdoor
+                            && outdoor.getLinkedPanels().contains(message.pos)) {
                         outdoor.setEnabled(message.enabled);
                         outdoor.setTargetTemp(panel.getTargetTemp());
+                        for (BlockPos indoorPos : outdoor.getLinkedIndoors()) {
+                            if (player.serverLevel().isLoaded(indoorPos)
+                                    && player.serverLevel().getBlockEntity(indoorPos) instanceof ACIndoorBlockEntity indoor
+                                    && indoor.getLinkedOutdoor() != null
+                                    && indoor.getLinkedOutdoor().equals(outdoorPos)) {
+                                indoor.setEnabled(message.enabled);
+                                indoor.setTargetTemp(panel.getTargetTemp());
+                                player.serverLevel().sendBlockUpdated(indoorPos, indoor.getBlockState(), indoor.getBlockState(), 3);
+                            }
+                        }
                         player.serverLevel().sendBlockUpdated(outdoorPos, outdoor.getBlockState(), outdoor.getBlockState(), 3);
                     }
                 }

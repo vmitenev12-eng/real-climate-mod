@@ -13,12 +13,69 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.realclimate.tileentity.ACOutdoorBlockEntity;
 import com.realclimate.tileentity.ACIndoorBlockEntity;
+import com.realclimate.tileentity.ControlPanelBlockEntity;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.core.BlockPos;
+import net.minecraftforge.event.TickEvent;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @Mod.EventBusSubscriber(modid = RealClimate.MODID, value = net.minecraftforge.api.distmarker.Dist.CLIENT)
 public final class KeyOverlayRenderer {
+    private static final int LINK_SCAN_RADIUS_CHUNKS = 2;
+    private static List<LinkLine> cachedLinkLines = List.of();
+    private static net.minecraft.client.multiplayer.ClientLevel cachedLevel;
+    private static long lastLinkScan = Long.MIN_VALUE;
+
     private KeyOverlayRenderer() {}
+
+    private record LinkLine(BlockPos from, BlockPos to) {}
+
+    @SubscribeEvent
+    public static void onClientTick(TickEvent.ClientTickEvent event) {
+        if (event.phase != TickEvent.Phase.END) return;
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.level == null || mc.player == null || !isHoldingInstallationKey(mc)) {
+            cachedLinkLines = List.of();
+            cachedLevel = mc.level;
+            return;
+        }
+
+        long gameTime = mc.level.getGameTime();
+        if (cachedLevel == mc.level && gameTime - lastLinkScan < 100) return;
+        cachedLevel = mc.level;
+        lastLinkScan = gameTime;
+
+        List<LinkLine> lines = new ArrayList<>();
+        BlockPos playerPos = mc.player.blockPosition();
+        int centerChunkX = playerPos.getX() >> 4;
+        int centerChunkZ = playerPos.getZ() >> 4;
+        for (int chunkX = centerChunkX - LINK_SCAN_RADIUS_CHUNKS;
+             chunkX <= centerChunkX + LINK_SCAN_RADIUS_CHUNKS; chunkX++) {
+            for (int chunkZ = centerChunkZ - LINK_SCAN_RADIUS_CHUNKS;
+                 chunkZ <= centerChunkZ + LINK_SCAN_RADIUS_CHUNKS; chunkZ++) {
+                var chunk = mc.level.getChunkSource().getChunk(chunkX, chunkZ, false);
+                if (chunk == null) continue;
+                for (var blockEntity : chunk.getBlockEntities().values()) {
+                    if (!(blockEntity instanceof ACOutdoorBlockEntity outdoor)) continue;
+                    BlockPos from = outdoor.getBlockPos();
+                    for (BlockPos indoorPos : outdoor.getLinkedIndoors()) {
+                        if (mc.level.getBlockEntity(indoorPos) instanceof ACIndoorBlockEntity) {
+                            lines.add(new LinkLine(from, indoorPos));
+                        }
+                    }
+                    for (BlockPos panelPos : outdoor.getLinkedPanels()) {
+                        if (mc.level.getBlockEntity(panelPos) instanceof ControlPanelBlockEntity panel
+                                && panel.getLinkedOutdoors().contains(from)) {
+                            lines.add(new LinkLine(from, panelPos));
+                        }
+                    }
+                }
+            }
+        }
+        cachedLinkLines = List.copyOf(lines);
+    }
 
     @SubscribeEvent
     public static void onLinkLines(RenderLevelStageEvent event) {
@@ -26,10 +83,7 @@ public final class KeyOverlayRenderer {
 
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.level == null) return;
-        var held = mc.player.getMainHandItem();
-        if (held.isEmpty()) return;
-        String itemId = BuiltInRegistries.ITEM.getKey(held.getItem()).toString();
-        if (!"real_climate:installation_key".equals(itemId)) return;
+        if (!isHoldingInstallationKey(mc)) return;
 
         PoseStack pose = event.getPoseStack();
         pose.pushPose();
@@ -41,25 +95,11 @@ public final class KeyOverlayRenderer {
         var buffer = mc.renderBuffers().bufferSource();
         VertexConsumer line = buffer.getBuffer(RenderType.LINES);
 
-        BlockPos center = mc.player.blockPosition();
-        for (int dx = -64; dx <= 64; dx++) {
-            for (int dz = -64; dz <= 64; dz++) {
-                int chunkX = center.getX() + dx * 16;
-                int chunkZ = center.getZ() + dz * 16;
-                var chunk = mc.level.getChunkSource().getChunk(chunkX >> 4, chunkZ >> 4, false);
-                if (chunk == null) continue;
-                for (var blockEntity : chunk.getBlockEntities().values()) {
-                    if (!(blockEntity instanceof ACOutdoorBlockEntity outdoor)) continue;
-                    BlockPos from = outdoor.getBlockPos();
-                    for (BlockPos to : outdoor.getLinkedIndoors()) {
-                        if (!(mc.level.getBlockEntity(to) instanceof ACIndoorBlockEntity)) continue;
-                        line.vertex(pose.last().pose(), from.getX() + 0.5f, from.getY() + 0.5f, from.getZ() + 0.5f)
-                                .color(255, 255, 255, 255).normal(pose.last().normal(), 0.0f, 1.0f, 0.0f).endVertex();
-                        line.vertex(pose.last().pose(), to.getX() + 0.5f, to.getY() + 0.5f, to.getZ() + 0.5f)
-                                .color(255, 255, 255, 255).normal(pose.last().normal(), 0.0f, 1.0f, 0.0f).endVertex();
-                    }
-                }
-            }
+        for (LinkLine link : cachedLinkLines) {
+            line.vertex(pose.last().pose(), link.from.getX() + 0.5f, link.from.getY() + 0.5f, link.from.getZ() + 0.5f)
+                    .color(255, 255, 255, 255).normal(pose.last().normal(), 0.0f, 1.0f, 0.0f).endVertex();
+            line.vertex(pose.last().pose(), link.to.getX() + 0.5f, link.to.getY() + 0.5f, link.to.getZ() + 0.5f)
+                    .color(255, 255, 255, 255).normal(pose.last().normal(), 0.0f, 1.0f, 0.0f).endVertex();
         }
         buffer.endBatch(RenderType.LINES);
         pose.popPose();
@@ -90,15 +130,18 @@ public final class KeyOverlayRenderer {
                     10, h - 18, 0xFFFFFFFF, true);
         }
 
-        var held = mc.player.getMainHandItem();
-        if (held.isEmpty()) return;
-        String itemId = BuiltInRegistries.ITEM.getKey(held.getItem()).toString();
-        if (!"real_climate:installation_key".equals(itemId)) return;
+        if (!isHoldingInstallationKey(mc)) return;
 
         String keyHint = w < 320
                 ? "Shift+ПКМ: разорвать"
                 : "ПКМ: связать; Shift+ПКМ: разорвать";
         e.getGuiGraphics().drawString(mc.font, Component.literal(keyHint),
                 6, w < 320 ? h - 42 : h - 34, 0xFFFFFFFF, true);
+    }
+
+    private static boolean isHoldingInstallationKey(Minecraft mc) {
+        var held = mc.player.getMainHandItem();
+        return !held.isEmpty() && "real_climate:installation_key".equals(
+                BuiltInRegistries.ITEM.getKey(held.getItem()).toString());
     }
 }

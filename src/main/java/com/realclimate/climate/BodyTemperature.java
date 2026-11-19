@@ -102,7 +102,7 @@ public final class BodyTemperature {
                 queue.addLast(neighbor);
             }
         }
-        return Math.max(-25.0, Math.min(25.0, heat));
+        return Math.max(-100.0, Math.min(100.0, heat));
     }
 
     private static double sourceStrength(Level level, BlockPos pos, BlockState state) {
@@ -125,7 +125,8 @@ public final class BodyTemperature {
             && state.getValue(com.realclimate.block.ACIndoorBlock.ACTIVE)) {
             return (indoor.getTargetTemp() - ClimateService.getTemperature(level, pos)) * 0.85;
         }
-        if (entity instanceof com.realclimate.tileentity.GrilleBlockEntity grille && grille.isOpen()) {
+        if (entity instanceof com.realclimate.tileentity.GrilleBlockEntity grille && grille.isOpen()
+            && VentilationService.hasActiveAirflow(level, pos)) {
             return (grille.getTargetTemp() - ClimateService.getTemperature(level, pos)) * 0.8;
         }
         return 0.0;

@@ -18,9 +18,13 @@ import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.VoxelShape;
 import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.AABB;
+import java.util.EnumMap;
+import java.util.IdentityHashMap;
+import java.util.Map;
 
 public class FacingBlock extends Block implements EntityBlock {
     public static final DirectionProperty FACING = BlockStateProperties.HORIZONTAL_FACING;
+    private static final Map<VoxelShape, EnumMap<Direction, VoxelShape>> ROTATED_SHAPES = new IdentityHashMap<>();
     protected final VoxelShape shape;
 
     public FacingBlock(Properties props) {
@@ -63,7 +67,21 @@ public class FacingBlock extends Block implements EntityBlock {
     }
 
     public static VoxelShape rotateShape(VoxelShape shape, Direction facing) {
-        if (facing == Direction.NORTH) return shape;
+        synchronized (ROTATED_SHAPES) {
+            EnumMap<Direction, VoxelShape> cache = ROTATED_SHAPES.get(shape);
+            if (cache == null) {
+                cache = new EnumMap<>(Direction.class);
+                cache.put(Direction.NORTH, shape);
+                for (Direction direction : Direction.Plane.HORIZONTAL) {
+                    if (direction != Direction.NORTH) cache.put(direction, rotateShapeUncached(shape, direction));
+                }
+                ROTATED_SHAPES.put(shape, cache);
+            }
+            return cache.get(facing);
+        }
+    }
+
+    private static VoxelShape rotateShapeUncached(VoxelShape shape, Direction facing) {
         VoxelShape rotated = Shapes.empty();
         for (AABB box : shape.toAabbs()) {
             double minX = box.minX;

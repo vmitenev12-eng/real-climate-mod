@@ -2,9 +2,11 @@ package com.realclimate.block;
 
 import com.realclimate.tileentity.GrilleBlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.EntityBlock;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.properties.BooleanProperty;
-import net.minecraft.world.level.block.state.BlockBehaviour;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.phys.shapes.CollisionContext;
@@ -14,7 +16,7 @@ import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.block.Mirror;
 import net.minecraft.world.level.block.Rotation;
 
-public class GrilleBlock extends FacingBlock {
+public class GrilleBlock extends FacingBlock implements EntityBlock {
     public static final BooleanProperty OPEN = BooleanProperty.create("open");
     protected static final VoxelShape SHAPE = Shapes.block();
 

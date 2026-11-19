@@ -2,10 +2,12 @@ package com.realclimate.block;
 
 import com.realclimate.tileentity.VentBlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.EntityBlock;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.properties.BooleanProperty;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.phys.shapes.CollisionContext;
@@ -16,7 +18,7 @@ import net.minecraft.world.level.block.Mirror;
 import net.minecraft.world.level.block.Rotation;
 import net.minecraft.tags.BlockTags;
 
-public class VentBlock extends FacingBlock {
+public class VentBlock extends FacingBlock implements EntityBlock {
     public static final BooleanProperty SEALED = BooleanProperty.create("sealed");
     protected static final VoxelShape SHAPE = Shapes.block();
 

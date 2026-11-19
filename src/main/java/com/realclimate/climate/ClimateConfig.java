@@ -1,8 +1,6 @@
 package com.realclimate.climate;
 
 import net.minecraftforge.common.ForgeConfigSpec;
-import net.minecraftforge.fml.ModLoadingContext;
-import net.minecraftforge.fml.config.ModConfig;
 
 public final class ClimateConfig {
     public static final ForgeConfigSpec SPEC;
@@ -18,7 +16,10 @@ public final class ClimateConfig {
         BASE_HUMIDITY = builder.comment("Базовая влажность (%)").defineInRange("base_humidity", 50.0, 0.0, 100.0);
         builder.pop();
         SPEC = builder.build();
-        // Регистрация выполняется в RealClimate, чтобы избежать двойной регистрации
+    }
+
+    public static double scale() {
+        return ClimateService.scale();
     }
 
     private ClimateConfig() {}

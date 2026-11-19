@@ -2,6 +2,7 @@ package com.realclimate.climate;
 
 import com.realclimate.RealClimate;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.BlockTags;
@@ -15,9 +16,14 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Температура тела игрока. Считается на сервере раз в 40 тиков (2 с), без постоянной нагрузки.
@@ -28,6 +34,7 @@ public final class BodyTemperature {
     public static final double NORMAL = 36.6;
     private static final String KEY = "realclimate_body";
     private static final int PERIOD = 40;
+    private static final Map<UUID, AmbientCache> AMBIENT_CACHE = new ConcurrentHashMap<>();
 
     private BodyTemperature() {}
 
@@ -42,70 +49,86 @@ public final class BodyTemperature {
 
     /** Температура воздуха в точке игрока с учётом погоды, укрытия и тепла рядом. */
     public static double effectiveAmbient(Player p) {
-        double scale = ClimateConfig.scale();
-        double t = ClimateService.temperature(p.getX(), p.getZ(), p.getY());
-        if (Double.isNaN(t) || Double.isInfinite(t)) t = 20.0;
         Level lv = p.level();
         BlockPos pos = p.blockPosition();
+        long gameTime = lv.getGameTime();
+        AmbientCache cached = AMBIENT_CACHE.get(p.getUUID());
+        if (cached != null && cached.dimension.equals(lv.dimension()) && cached.pos.equals(pos)
+                && gameTime >= cached.gameTime && gameTime - cached.gameTime < 20) {
+            return cached.temperature;
+        }
+
+        double t = ClimateService.temperature(p.getX(), p.getZ(), p.getY());
+        if (Double.isNaN(t) || Double.isInfinite(t)) t = 20.0;
         if (lv.isRainingAt(pos)) t -= 3.0;
         if (p.isInWater()) t -= 6.0;
         if (!lv.canSeeSky(pos) && pos.getY() < lv.getSeaLevel() - 8) {
             // глубокие пещеры стабилизируются около +10 °C
             t = t * 0.4 + 6.0;
         }
-        return t + heatNearby(lv, pos);
+        double result = t + heatNearby(lv, pos) + VentilationService.temperatureOffset(lv, pos, t);
+        AMBIENT_CACHE.put(p.getUUID(), new AmbientCache(lv.dimension(), pos.immutable(), gameTime, result));
+        return result;
     }
 
-    /** Тепло от открытого огня, лавы, печей рядом (радиус 3). */
+    private record AmbientCache(net.minecraft.resources.ResourceKey<Level> dimension, BlockPos pos,
+                                long gameTime, double temperature) {}
+
+    /** Heat and cold travel only through connected air cells, not through solid walls. */
     private static double heatNearby(Level lv, BlockPos c) {
         double heat = 0;
-        boolean enclosed = !lv.canSeeSky(c);
-        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
-        for (int dx = -15; dx <= 15; dx++)
-            for (int dy = -8; dy <= 8; dy++)
-                for (int dz = -15; dz <= 15; dz++) {
-                    int manhattan = Math.abs(dx) + Math.abs(dy) + Math.abs(dz);
-                    if (manhattan > 15) continue;
-                    m.set(c.getX() + dx, c.getY() + dy, c.getZ() + dz);
-                    BlockState s = lv.getBlockState(m);
-                    if (s.isAir()) continue;
+        java.util.ArrayDeque<BlockPos> queue = new java.util.ArrayDeque<>();
+        java.util.Map<BlockPos, Integer> distances = new java.util.HashMap<>();
+        java.util.Set<BlockPos> countedSources = new java.util.HashSet<>();
+        BlockPos start = c.immutable();
+        queue.add(start);
+        distances.put(start, 0);
 
-                    double w = 0;
-                    if (s.is(Blocks.LAVA)) w = enclosed ? 8 : 4;
-                    else if (s.is(BlockTags.FIRE)) w = enclosed ? 6 : 3;
-                    else if (s.is(BlockTags.CAMPFIRES) && s.hasProperty(net.minecraft.world.level.block.CampfireBlock.LIT)
-                            && s.getValue(net.minecraft.world.level.block.CampfireBlock.LIT)) w = enclosed ? 7 : 4;
-                    else if ((s.is(Blocks.FURNACE) || s.is(Blocks.BLAST_FURNACE) || s.is(Blocks.SMOKER))
-                            && s.hasProperty(net.minecraft.world.level.block.state.properties.BlockStateProperties.LIT)
-                            && s.getValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.LIT)) w = enclosed ? 5 : 2;
-                    else if (s.is(Blocks.TORCH) || s.is(Blocks.WALL_TORCH)) w = enclosed ? 1.0 : 0.5;
-                    else if (s.is(com.realclimate.registry.ModBlocks.AC_INDOOR.get())) {
-                        net.minecraft.world.level.block.entity.BlockEntity entity = lv.getBlockEntity(m);
-                        if (entity instanceof com.realclimate.tileentity.ACIndoorBlockEntity indoor
-                                && indoor.isEnabled() && stateValue(s, com.realclimate.block.ACIndoorBlock.ACTIVE)) {
-                            w = (indoor.getTargetTemp() - 20.0) * 0.35 * (enclosed ? 1.0 : 0.5);
-                        }
-                    }
-                    else if (s.is(com.realclimate.registry.ModBlocks.GRILLE_BLOCK.get())) {
-                        net.minecraft.world.level.block.entity.BlockEntity entity = lv.getBlockEntity(m);
-                        if (entity instanceof com.realclimate.tileentity.GrilleBlockEntity grille
-                                && grille.isOpen()) {
-                            w = (grille.getTargetTemp() - 20.0) * 0.28 * (enclosed ? 1.0 : 0.4);
-                        }
-                    }
-                    else if (s.is(com.realclimate.registry.ModBlocks.RADIATOR.get())
-                            && s.hasProperty(com.realclimate.block.RadiatorBlock.ACTIVE)
-                            && s.getValue(com.realclimate.block.RadiatorBlock.ACTIVE)) w = enclosed ? 12 : 5;
+        while (!queue.isEmpty() && distances.size() < 4096) {
+            BlockPos airPos = queue.removeFirst();
+            int distance = distances.get(airPos);
 
-                    if (w > 0) {
-                        heat += w * (1.0 - Math.min(1.0, manhattan / 16.0));
-                    }
+            for (Direction direction : Direction.values()) {
+                BlockPos neighbor = airPos.relative(direction);
+                BlockState state = lv.getBlockState(neighbor);
+                double source = sourceStrength(lv, neighbor, state);
+                if (source != 0.0 && countedSources.add(neighbor)) {
+                    heat += source * (1.0 - Math.min(1.0, (distance + 1) / 16.0));
                 }
+
+                if (distance >= 15 || distances.containsKey(neighbor)
+                    || !MiniBlockIntegration.allowsAirPassage(lv, neighbor, direction)) continue;
+                distances.put(neighbor, distance + 1);
+                queue.addLast(neighbor);
+            }
+        }
         return Math.max(-25.0, Math.min(25.0, heat));
     }
 
-    private static boolean stateValue(BlockState state, net.minecraft.world.level.block.state.properties.BooleanProperty property) {
-        return state.hasProperty(property) && state.getValue(property);
+    private static double sourceStrength(Level level, BlockPos pos, BlockState state) {
+        boolean enclosed = !level.canSeeSky(pos);
+        if (state.is(Blocks.LAVA)) return enclosed ? 8.0 : 4.0;
+        if (state.is(BlockTags.FIRE)) return enclosed ? 6.0 : 3.0;
+        if (state.is(BlockTags.CAMPFIRES) && state.hasProperty(net.minecraft.world.level.block.CampfireBlock.LIT)
+                && state.getValue(net.minecraft.world.level.block.CampfireBlock.LIT)) return enclosed ? 7.0 : 4.0;
+        if ((state.is(Blocks.FURNACE) || state.is(Blocks.BLAST_FURNACE) || state.is(Blocks.SMOKER))
+                && state.hasProperty(net.minecraft.world.level.block.state.properties.BlockStateProperties.LIT)
+                && state.getValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.LIT)) return enclosed ? 5.0 : 2.0;
+        if (state.is(Blocks.TORCH) || state.is(Blocks.WALL_TORCH)) return enclosed ? 1.0 : 0.5;
+
+        BlockEntity entity = level.getBlockEntity(pos);
+        if (entity instanceof com.realclimate.tileentity.RadiatorBlockEntity radiator && radiator.isEnabled()) {
+            return Math.max(0.0, radiator.getTargetTemp() - ClimateService.getTemperature(level, pos)) * 0.45;
+        }
+        if (entity instanceof com.realclimate.tileentity.ACIndoorBlockEntity indoor && indoor.isEnabled()
+            && state.hasProperty(com.realclimate.block.ACIndoorBlock.ACTIVE)
+            && state.getValue(com.realclimate.block.ACIndoorBlock.ACTIVE)) {
+            return (indoor.getTargetTemp() - ClimateService.getTemperature(level, pos)) * 0.85;
+        }
+        if (entity instanceof com.realclimate.tileentity.GrilleBlockEntity grille && grille.isOpen()) {
+            return (grille.getTargetTemp() - ClimateService.getTemperature(level, pos)) * 0.8;
+        }
+        return 0.0;
     }
 
     /** Теплоизоляция брони: 0..1. */

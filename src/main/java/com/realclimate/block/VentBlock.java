@@ -23,7 +23,7 @@ import com.realclimate.registry.ModBlockEntities;
 
 public class VentBlock extends FacingBlock {
     public static final BooleanProperty SEALED = BooleanProperty.create("sealed");
-    protected static final VoxelShape SHAPE = Shapes.block();
+    protected static final VoxelShape SHAPE = Shapes.box(0.25, 0.0, 0.25, 0.75, 1.0, 0.75);
 
     public VentBlock(Properties props) {
         super(props, SHAPE);

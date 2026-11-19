@@ -21,7 +21,7 @@ public class RadiatorBlockEntity extends BlockEntity {
     public boolean isEnabled() { return enabled; }
     public void setEnabled(boolean e) { this.enabled = e; setChanged(); }
     public double getTargetTemp() { return targetTemp; }
-    public void setTargetTemp(double t) { this.targetTemp = Math.max(-20.0, Math.min(95.0, t)); setChanged(); }
+    public void setTargetTemp(double t) { this.targetTemp = Math.max(20.0, Math.min(90.0, t)); setChanged(); }
     public double getHeatBuffer() { return heatBuffer; }
     public void addHeat(double h) { this.heatBuffer += h; }
 
@@ -36,7 +36,7 @@ public class RadiatorBlockEntity extends BlockEntity {
     public void load(CompoundTag tag) {
         super.load(tag);
         enabled = tag.getBoolean("Enabled");
-        targetTemp = Math.max(-20.0, Math.min(95.0, tag.getDouble("TargetTemp")));
+        targetTemp = Math.max(20.0, Math.min(90.0, tag.getDouble("TargetTemp")));
     }
 
     public static void serverTick(Level level, BlockPos pos, BlockState state, RadiatorBlockEntity be) {

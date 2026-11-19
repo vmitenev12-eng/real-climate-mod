@@ -23,7 +23,7 @@ public class FacingBlock extends Block implements EntityBlock {
     protected final VoxelShape shape;
 
     public FacingBlock(Properties props) {
-        this(props, Shapes.block());
+        this(props, Shapes.box(0.25, 0.25, 0.25, 0.75, 0.75, 0.75));
     }
 
     public FacingBlock(Properties props, VoxelShape shape) {
@@ -49,6 +49,11 @@ public class FacingBlock extends Block implements EntityBlock {
 
     @Override
     public VoxelShape getShape(BlockState s, BlockGetter g, BlockPos p, CollisionContext c) { return shape; }
+
+    @Override
+    public VoxelShape getCollisionShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {
+        return shape;
+    }
 
     @Override
     public BlockEntity newBlockEntity(BlockPos p, BlockState st) { return null; }

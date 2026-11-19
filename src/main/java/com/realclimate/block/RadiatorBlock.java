@@ -26,7 +26,7 @@ import com.realclimate.registry.ModBlockEntities;
 
 public class RadiatorBlock extends FacingBlock {
     public static final BooleanProperty ACTIVE = BooleanProperty.create("active");
-    protected static final VoxelShape SHAPE = Shapes.block();
+    protected static final VoxelShape SHAPE = Shapes.box(0.12, 0.04, 0.28, 0.88, 0.92, 0.72);
 
     public RadiatorBlock(Properties props) {
         super(props, SHAPE);
@@ -58,13 +58,8 @@ public class RadiatorBlock extends FacingBlock {
         if (hand == InteractionHand.MAIN_HAND
                 && !player.isShiftKeyDown() && player.getMainHandItem().isEmpty()) {
             BlockEntity be = level.getBlockEntity(pos);
-            if (be instanceof RadiatorBlockEntity radiator) {
-                if (level.isClientSide) {
-                    net.minecraft.client.Minecraft.getInstance().setScreen(
-                            new com.realclimate.client.ClimateSettingsScreen(pos, radiator.isEnabled(), radiator.getTargetTemp()));
-                }
-                return InteractionResult.SUCCESS;
-            }
+            if (be instanceof RadiatorBlockEntity) return level.isClientSide
+                    ? InteractionResult.SUCCESS : InteractionResult.CONSUME;
         }
         return InteractionResult.PASS;
     }

@@ -26,7 +26,7 @@ import com.realclimate.registry.ModBlockEntities;
 
 public class ACOutdoorBlock extends FacingBlock {
     public static final BooleanProperty CONNECTED = BooleanProperty.create("connected");
-    protected static final VoxelShape SHAPE = Shapes.block();
+    protected static final VoxelShape SHAPE = Shapes.box(0.08, 0.08, 0.08, 0.92, 0.92, 0.92);
 
     public ACOutdoorBlock(Properties props) {
         super(props, SHAPE);
@@ -69,13 +69,8 @@ public class ACOutdoorBlock extends FacingBlock {
         if (hand == InteractionHand.MAIN_HAND
                 && !player.isShiftKeyDown() && player.getMainHandItem().isEmpty()) {
             BlockEntity be = level.getBlockEntity(pos);
-            if (be instanceof ACOutdoorBlockEntity outdoor) {
-                if (level.isClientSide) {
-                    net.minecraft.client.Minecraft.getInstance().setScreen(
-                            new com.realclimate.client.ClimateSettingsScreen(pos, outdoor.isEnabled(), outdoor.getTargetTemp()));
-                }
-                return InteractionResult.SUCCESS;
-            }
+            if (be instanceof ACOutdoorBlockEntity) return level.isClientSide
+                    ? InteractionResult.SUCCESS : InteractionResult.CONSUME;
         }
         return InteractionResult.PASS;
     }

@@ -22,7 +22,7 @@ import com.realclimate.registry.ModBlockEntities;
 
 public class ACIndoorBlock extends FacingBlock {
     public static final BooleanProperty ACTIVE = BooleanProperty.create("active");
-    protected static final VoxelShape SHAPE = Shapes.block();
+    protected static final VoxelShape SHAPE = Shapes.box(0.08, 0.18, 0.18, 0.92, 0.88, 0.82);
 
     public ACIndoorBlock(Properties props) {
         super(props, SHAPE);

@@ -37,32 +37,42 @@ public class PacketClimateSettings {
         NetworkEvent.Context context = contextSupplier.get();
         context.enqueueWork(() -> {
             ServerPlayer player = context.getSender();
-            if (player == null || player.level().getBlockEntity(message.pos) == null) return;
+            if (player == null) return;
+            if (!Double.isFinite(message.targetTemperature)) return;
             if (player.distanceToSqr(message.pos.getX() + 0.5, message.pos.getY() + 0.5, message.pos.getZ() + 0.5) > 36.0) return;
 
-            double target = Math.max(-20.0, Math.min(95.0, message.targetTemperature));
             BlockEntity blockEntity = player.serverLevel().getBlockEntity(message.pos);
+            if (blockEntity == null) return;
             if (blockEntity instanceof ACOutdoorBlockEntity outdoor) {
                 outdoor.setEnabled(message.enabled);
-                outdoor.setTargetTemp(target);
+                outdoor.setTargetTemp(clampHvac(message.targetTemperature));
             } else if (blockEntity instanceof RadiatorBlockEntity radiator) {
                 radiator.setEnabled(message.enabled);
-                radiator.setTargetTemp(target);
+                radiator.setTargetTemp(Math.max(20.0, Math.min(90.0, message.targetTemperature)));
             } else if (blockEntity instanceof ControlPanelBlockEntity panel) {
                 panel.setEnabled(message.enabled);
-                panel.setTargetTemp(target);
+                panel.setTargetTemp(clampHvac(message.targetTemperature));
                 for (BlockPos outdoorPos : panel.getLinkedOutdoors()) {
                     BlockEntity outdoorEntity = player.serverLevel().getBlockEntity(outdoorPos);
                     if (outdoorEntity instanceof ACOutdoorBlockEntity outdoor) {
                         outdoor.setEnabled(message.enabled);
-                        outdoor.setTargetTemp(target);
+                        outdoor.setTargetTemp(panel.getTargetTemp());
+                        player.serverLevel().sendBlockUpdated(outdoorPos, outdoor.getBlockState(), outdoor.getBlockState(), 3);
                     }
                 }
             } else if (blockEntity instanceof ACIndoorBlockEntity indoor) {
                 indoor.setEnabled(message.enabled);
-                indoor.setTargetTemp(target);
+                indoor.setTargetTemp(clampHvac(message.targetTemperature));
+            } else {
+                return;
             }
+            blockEntity.setChanged();
+            player.serverLevel().sendBlockUpdated(message.pos, blockEntity.getBlockState(), blockEntity.getBlockState(), 3);
         });
         context.setPacketHandled(true);
+    }
+
+    private static double clampHvac(double temperature) {
+        return Math.max(-20.0, Math.min(95.0, temperature));
     }
 }

@@ -22,7 +22,7 @@ import com.realclimate.registry.ModBlockEntities;
 
 public class GrilleBlock extends FacingBlock {
     public static final BooleanProperty OPEN = BooleanProperty.create("open");
-    protected static final VoxelShape SHAPE = Shapes.block();
+    protected static final VoxelShape SHAPE = Shapes.box(0.0, 0.38, 0.0, 1.0, 0.62, 1.0);
 
     public GrilleBlock(Properties props) {
         super(props, SHAPE);

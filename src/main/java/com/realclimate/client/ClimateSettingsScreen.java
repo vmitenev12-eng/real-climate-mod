@@ -11,15 +11,24 @@ import net.minecraft.network.chat.Component;
 
 public class ClimateSettingsScreen extends Screen {
     private final BlockPos pos;
+    private final double minimumTemperature;
+    private final double maximumTemperature;
     private boolean enabled;
     private double targetTemperature;
     private EditBox temperatureBox;
 
     public ClimateSettingsScreen(BlockPos pos, boolean enabled, double targetTemperature) {
+        this(pos, enabled, targetTemperature, -20.0, 95.0);
+    }
+
+    public ClimateSettingsScreen(BlockPos pos, boolean enabled, double targetTemperature,
+                                 double minimumTemperature, double maximumTemperature) {
         super(Component.literal("Настройки климатического блока"));
         this.pos = pos;
+        this.minimumTemperature = minimumTemperature;
+        this.maximumTemperature = maximumTemperature;
         this.enabled = enabled;
-        this.targetTemperature = Math.max(-20.0, Math.min(95.0, targetTemperature));
+        this.targetTemperature = clamp(targetTemperature);
     }
 
     @Override
@@ -32,7 +41,7 @@ public class ClimateSettingsScreen extends Screen {
         temperatureBox.setValue(String.format(java.util.Locale.ROOT, "%.1f", targetTemperature));
         temperatureBox.setResponder(value -> {
             try {
-                targetTemperature = Math.max(-20.0, Math.min(95.0, Double.parseDouble(value.replace(',', '.'))));
+                targetTemperature = clamp(Double.parseDouble(value.replace(',', '.')));
             } catch (NumberFormatException ignored) {
             }
         });
@@ -53,18 +62,21 @@ public class ClimateSettingsScreen extends Screen {
     }
 
     private void changeTemperature(double delta) {
-        targetTemperature = Math.max(-20.0, Math.min(95.0, targetTemperature + delta));
+        targetTemperature = clamp(targetTemperature + delta);
         temperatureBox.setValue(String.format(java.util.Locale.ROOT, "%.1f", targetTemperature));
     }
 
     private void save() {
         try {
-            targetTemperature = Math.max(-20.0,
-                    Math.min(95.0, Double.parseDouble(temperatureBox.getValue().replace(',', '.'))));
+                targetTemperature = clamp(Double.parseDouble(temperatureBox.getValue().replace(',', '.')));
         } catch (NumberFormatException ignored) {
         }
         ModMessages.sendToServer(new PacketClimateSettings(pos, enabled, targetTemperature));
         this.onClose();
+    }
+
+    private double clamp(double temperature) {
+        return Math.max(minimumTemperature, Math.min(maximumTemperature, temperature));
     }
 
     @Override
@@ -72,7 +84,8 @@ public class ClimateSettingsScreen extends Screen {
         this.renderBackground(graphics);
         super.render(graphics, mouseX, mouseY, partialTick);
         graphics.drawCenteredString(this.font, this.title, this.width / 2, this.height / 2 - 75, 0xFFFFFF);
-        graphics.drawCenteredString(this.font, Component.literal("Температура: от -20 до +95 °C"),
+        graphics.drawCenteredString(this.font, Component.literal(String.format(java.util.Locale.ROOT,
+                "Температура: от %.0f до +%.0f °C", minimumTemperature, maximumTemperature)),
                 this.width / 2, this.height / 2 - 5, 0xCCCCCC);
     }
 }

@@ -7,11 +7,14 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.Level;
+import com.realclimate.climate.ClimateService;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
+import net.minecraft.network.protocol.game.ClientGamePacketListener;
 
 public class ACIndoorBlockEntity extends BlockEntity {
     private BlockPos linkedOutdoor;
     private boolean enabled = true;
-    private double coolBuffer = 0.0;
     private double targetTemp = 22.0;
 
     public ACIndoorBlockEntity(BlockPos pos, BlockState state) {
@@ -19,13 +22,18 @@ public class ACIndoorBlockEntity extends BlockEntity {
     }
 
     public BlockPos getLinkedOutdoor() { return linkedOutdoor; }
-    public void setLinkedOutdoor(BlockPos p) { this.linkedOutdoor = p; setChanged(); }
+    public void setLinkedOutdoor(BlockPos p) {
+        if (java.util.Objects.equals(linkedOutdoor, p)) return;
+        linkedOutdoor = p;
+        setChanged();
+    }
     public boolean isEnabled() { return enabled; }
-    public void setEnabled(boolean e) { this.enabled = e; setChanged(); }
-    public double getCoolBuffer() { return coolBuffer; }
+    public void setEnabled(boolean e) { if (enabled != e) { enabled = e; setChanged(); } }
     public double getTargetTemp() { return targetTemp; }
-    public void setTargetTemp(double targetTemp) { this.targetTemp = Math.max(-20.0, Math.min(95.0, targetTemp)); setChanged(); }
-    public void addCool(double c) { this.coolBuffer += c; }
+    public void setTargetTemp(double targetTemp) {
+        double clamped = Math.max(-20.0, Math.min(95.0, targetTemp));
+        if (this.targetTemp != clamped) { this.targetTemp = clamped; setChanged(); }
+    }
 
     @Override
     public void saveAdditional(CompoundTag tag) {
@@ -42,6 +50,7 @@ public class ACIndoorBlockEntity extends BlockEntity {
     @Override
     public void load(CompoundTag tag) {
         super.load(tag);
+        linkedOutdoor = null;
         if (tag.contains("LinkedX")) {
             linkedOutdoor = new BlockPos(tag.getInt("LinkedX"), tag.getInt("LinkedY"), tag.getInt("LinkedZ"));
         }
@@ -49,14 +58,38 @@ public class ACIndoorBlockEntity extends BlockEntity {
         targetTemp = Math.max(-20.0, Math.min(95.0, tag.getDouble("TargetTemp")));
     }
 
+    @Override
+    public CompoundTag getUpdateTag() {
+        CompoundTag tag = new CompoundTag();
+        saveAdditional(tag);
+        return tag;
+    }
+
+    @Override
+    public Packet<ClientGamePacketListener> getUpdatePacket() {
+        return ClientboundBlockEntityDataPacket.create(this);
+    }
+
     public static void serverTick(Level level, BlockPos pos, BlockState state, ACIndoorBlockEntity be) {
-        if (!be.isEnabled() || be.linkedOutdoor == null) return;
-        double cool = be.coolBuffer;
-        be.coolBuffer = 0;
-        if (Math.abs(cool) > 0.01) {
-            level.setBlock(pos, state.setValue(ACIndoorBlock.ACTIVE, Math.abs(cool) > 0.1), 3);
-        } else {
-            level.setBlock(pos, state.setValue(ACIndoorBlock.ACTIVE, false), 3);
+        if (!be.isEnabled() || be.linkedOutdoor == null) {
+            setActive(level, pos, state, false);
+            return;
+        }
+        if (level.getGameTime() % 20 != 0) return;
+        BlockPos outdoorPos = be.linkedOutdoor;
+        if (!level.isLoaded(outdoorPos)
+            || !(level.getBlockEntity(outdoorPos) instanceof ACOutdoorBlockEntity outdoor)
+                || !outdoor.isEnabled()) {
+            setActive(level, pos, state, false);
+            return;
+        }
+        double ambient = ClimateService.getTemperature(level, pos);
+        setActive(level, pos, state, Math.abs(be.targetTemp - ambient) > 0.1);
+    }
+
+    private static void setActive(Level level, BlockPos pos, BlockState state, boolean active) {
+        if (state.getValue(ACIndoorBlock.ACTIVE) != active) {
+            level.setBlock(pos, state.setValue(ACIndoorBlock.ACTIVE, active), 3);
         }
     }
 }

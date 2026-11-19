@@ -27,6 +27,7 @@ public final class ClimateEvents {
     @SubscribeEvent
     public static void onStopped(ServerStoppedEvent e) {
         ClimateService.stop();
+        VentilationService.clear();
     }
 
     @SubscribeEvent

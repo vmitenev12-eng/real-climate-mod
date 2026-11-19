@@ -1,6 +1,5 @@
 package com.realclimate.block;
 
-import com.realclimate.client.ClimateSettingsScreen;
 import com.realclimate.registry.ModBlockEntities;
 import com.realclimate.tileentity.ControlPanelBlockEntity;
 import net.minecraft.core.BlockPos;
@@ -60,6 +59,12 @@ public class ControlPanelBlock extends Block implements EntityBlock {
     }
 
     @Override
+    public VoxelShape getCollisionShape(BlockState state, net.minecraft.world.level.BlockGetter level,
+                                        BlockPos pos, CollisionContext context) {
+        return SHAPE;
+    }
+
+    @Override
     public BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
         return new ControlPanelBlockEntity(pos, state);
     }
@@ -67,14 +72,8 @@ public class ControlPanelBlock extends Block implements EntityBlock {
     @Override
     public InteractionResult use(BlockState state, Level level, BlockPos pos, Player player,
                                 InteractionHand hand, BlockHitResult hit) {
-        if (hand != InteractionHand.MAIN_HAND || player.isShiftKeyDown()) return InteractionResult.PASS;
-        if (level.isClientSide) {
-            BlockEntity blockEntity = level.getBlockEntity(pos);
-            if (blockEntity instanceof ControlPanelBlockEntity panel) {
-                net.minecraft.client.Minecraft.getInstance().setScreen(
-                        new ClimateSettingsScreen(pos, panel.isEnabled(), panel.getTargetTemp()));
-                return InteractionResult.SUCCESS;
-            }
+        if (hand != InteractionHand.MAIN_HAND || player.isShiftKeyDown() || !player.getMainHandItem().isEmpty()) {
+            return InteractionResult.PASS;
         }
         return level.isClientSide ? InteractionResult.SUCCESS : InteractionResult.CONSUME;
     }

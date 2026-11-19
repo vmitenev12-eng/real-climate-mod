@@ -1,7 +1,7 @@
 package com.realclimate.tileentity;
 
 import com.realclimate.block.ACOutdoorBlock;
-import com.realclimate.climate.ClimateService;
+import com.realclimate.climate.VentilationService;
 import com.realclimate.registry.ModBlockEntities;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
@@ -45,9 +45,12 @@ public class ACOutdoorBlockEntity extends BlockEntity {
     public void unlinkAllPanels() { if (!linkedPanels.isEmpty()) { linkedPanels.clear(); setChanged(); } }
 
     public boolean isEnabled() { return enabled; }
-    public void setEnabled(boolean e) { this.enabled = e; setChanged(); }
+    public void setEnabled(boolean e) { if (enabled != e) { enabled = e; setChanged(); } }
     public double getTargetTemp() { return targetTemp; }
-    public void setTargetTemp(double t) { this.targetTemp = t; setChanged(); }
+    public void setTargetTemp(double t) {
+        double clamped = Math.max(-20.0, Math.min(95.0, t));
+        if (targetTemp != clamped) { targetTemp = clamped; setChanged(); }
+    }
 
     @Override
     public void saveAdditional(CompoundTag tag) {
@@ -101,28 +104,36 @@ public class ACOutdoorBlockEntity extends BlockEntity {
 
     public void onRemove() {
         linkedIndoors.clear();
+        linkedPanels.clear();
+        if (level != null && !level.isClientSide) VentilationService.removeSource(level, worldPosition);
     }
 
     public static void serverTick(Level level, BlockPos pos, BlockState state, ACOutdoorBlockEntity be) {
-        if (!be.isEnabled()) return;
+        if (level.getGameTime() % 20 != 0) return;
+        if (!be.isEnabled()) {
+            for (BlockPos indoorPos : be.linkedIndoors) {
+                if (level.isLoaded(indoorPos) && level.getBlockEntity(indoorPos) instanceof ACIndoorBlockEntity indoor) {
+                    indoor.setEnabled(false);
+                }
+            }
+            VentilationService.removeSource(level, pos);
+            return;
+        }
         double target = be.getTargetTemp();
         for (BlockPos panelPos : be.linkedPanels) {
+            if (!level.isLoaded(panelPos)) continue;
             BlockEntity panelEntity = level.getBlockEntity(panelPos);
             if (panelEntity instanceof ControlPanelBlockEntity panel && panel.isEnabled()) {
                 target = panel.getTargetTemp();
-                be.targetTemp = target;
+                be.setTargetTemp(target);
                 break;
             }
         }
-        double outside = ClimateService.getTemperature(level, pos);
-        double cooling = (outside - target) * 0.5;
-        if (Math.abs(cooling) > 0.5 && !be.linkedIndoors.isEmpty()) {
-            double splitCooling = cooling / be.linkedIndoors.size();
+        if (!be.linkedIndoors.isEmpty()) {
             for (BlockPos ip : be.linkedIndoors) {
                 if (level.isLoaded(ip)) {
                     BlockEntity ibe = level.getBlockEntity(ip);
                     if (ibe instanceof ACIndoorBlockEntity indoor) {
-                        indoor.addCool(splitCooling * 0.3);
                         indoor.setTargetTemp(target);
                         indoor.setEnabled(true);
                     }
@@ -136,6 +147,7 @@ public class ACOutdoorBlockEntity extends BlockEntity {
     private static void propagateThroughVentilation(Level level, BlockPos outdoorPos, double targetTemp) {
         Queue<BlockPos> queue = new ArrayDeque<>();
         Set<BlockPos> visited = new HashSet<>();
+        java.util.Map<BlockPos, Double> airflow = new java.util.HashMap<>();
         queue.add(outdoorPos);
 
         while (!queue.isEmpty()) {
@@ -146,11 +158,30 @@ public class ACOutdoorBlockEntity extends BlockEntity {
                 BlockPos next = current.relative(direction);
                 if (visited.contains(next) || !level.isLoaded(next)) continue;
                 BlockState nextState = level.getBlockState(next);
-                if (nextState.getBlock() instanceof com.realclimate.block.VentBlock
-                        || nextState.getBlock() instanceof com.realclimate.block.GrilleBlock) {
+                if (nextState.isAir()) {
+                    BlockPos afterGap = next.relative(direction);
+                    if (level.isLoaded(afterGap) && isDuctOrGrille(level.getBlockState(afterGap))) {
+                        airflow.put(next.immutable(), 1.0);
+                        queue.add(afterGap);
+                    }
+                    continue;
+                }
+                if (isDuctOrGrille(nextState)) {
+                    String blockId = net.minecraftforge.registries.ForgeRegistries.BLOCKS.getKey(nextState.getBlock()).getPath();
+                    boolean terminal = nextState.getBlock() instanceof com.realclimate.block.GrilleBlock
+                            || blockId.equals("vent_ceiling_grille");
+                    int expectedConnections = expectedConnections(blockId);
+                    int connected = 0;
+                    for (net.minecraft.core.Direction side : net.minecraft.core.Direction.values()) {
+                        BlockPos neighborPos = next.relative(side);
+                        BlockState neighbor = level.getBlockState(neighborPos);
+                        if (neighbor.getBlock() instanceof ACOutdoorBlock || isDuctOrGrille(neighbor)) connected++;
+                    }
+                    double loss = terminal ? 2.0 : Math.max(0.0, (expectedConnections - connected) / (double) expectedConnections);
+                    airflow.put(next.immutable(), loss);
                     if (nextState.getBlock() instanceof com.realclimate.block.VentBlock
                             && level.getBlockEntity(next) instanceof com.realclimate.tileentity.VentBlockEntity vent) {
-                        vent.setSealed(true);
+                        vent.setSealed(loss == 0.0);
                         vent.setTempBuffer(targetTemp);
                     }
                     if (level.getBlockEntity(next) instanceof com.realclimate.tileentity.GrilleBlockEntity grille) {
@@ -160,5 +191,19 @@ public class ACOutdoorBlockEntity extends BlockEntity {
                 }
             }
         }
+        VentilationService.updatePath(level, outdoorPos, airflow, targetTemp);
+    }
+
+    private static boolean isDuctOrGrille(BlockState state) {
+        net.minecraft.resources.ResourceLocation id = net.minecraftforge.registries.ForgeRegistries.BLOCKS.getKey(state.getBlock());
+        if (id == null || !id.getNamespace().equals("real_climate")) return false;
+        return id.getPath().startsWith("vent_") || id.getPath().equals("vent_block")
+                || id.getPath().equals("grille_block");
+    }
+
+    private static int expectedConnections(String blockId) {
+        if (blockId.contains("cross")) return 4;
+        if (blockId.contains("tee")) return 3;
+        return 2;
     }
 }

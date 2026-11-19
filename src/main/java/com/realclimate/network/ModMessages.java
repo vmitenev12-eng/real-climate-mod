@@ -2,6 +2,7 @@ package com.realclimate.network;
 
 import com.realclimate.RealClimate;
 import net.minecraftforge.network.NetworkRegistry;
+import net.minecraftforge.network.NetworkDirection;
 import net.minecraftforge.network.simple.SimpleChannel;
 
 public final class ModMessages {

@@ -9,7 +9,6 @@ import net.minecraft.world.level.block.state.properties.DirectionProperty;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.block.Mirror;
 import net.minecraft.world.level.block.Rotation;
@@ -50,11 +49,6 @@ public abstract class FacingBlock extends Block {
     @Override
     public VoxelShape getShape(BlockState s, BlockGetter g, BlockPos p, CollisionContext c) { return shape; }
 
-    public enum RenderType { MODEL, ENTITY }
-    public RenderType getRenderType(BlockState s) { return RenderType.MODEL; }
-
     @Override
     public BlockEntity newBlockEntity(BlockPos p, BlockState st) { return null; }
-
-    public <T extends BlockEntity> BlockEntityType<T> getBlockEntityType() { return null; }
 }

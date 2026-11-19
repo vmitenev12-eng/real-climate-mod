@@ -13,6 +13,15 @@
  "block.real_climate.ac_indoor": "Внутренний блок кондиционера",
  "block.real_climate.ac_outdoor": "Наружный блок кондиционера",
  "block.real_climate.radiator": "Радиатор отопления",
+ "block.real_climate.vent_block": "Вентшахта",
+ "block.real_climate.grille_block": "Вентиляционная решётка",
  "itemGroup.real_climate": "Real Climate",
- "item.real_climate.hammer": "Молоточек"
+ "item.real_climate.hammer": "Молоточек",
+ "item.real_climate.installation_key": "Ключ монтажника",
+ "tooltip.real_climate.link_ac": "ПКМ по внутреннему блоку для привязки",
+ "gui.real_climate.link_title": "Связь кондиционера",
+ "gui.real_climate.link_outdoor": "Наружный блок",
+ "gui.real_climate.link_indoor": "Внутренний блок",
+ "gui.real_climate.link_button": "Связать",
+ "gui.real_climate.unlink_button": "Отвязать"
 }

@@ -1,0 +1,12 @@
+{
+ "type": "minecraft:crafting_shaped",
+ "pattern": [
+  "III",
+  "I I",
+  "III"
+ ],
+ "key": {
+  "I": { "item": "minecraft:iron_bars" }
+ },
+ "result": { "item": "real_climate:grille_block", "count": 2 }
+}

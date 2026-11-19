@@ -51,7 +51,7 @@ public final class ClimateEvents {
     private static int info(CommandContext<CommandSourceStack> ctx) {
         CommandSourceStack src = ctx.getSource();
         Vec3 p = src.getPosition();
-        double scale = ClimateConfig.scale();
+        double scale = ClimateService.scale();
         double lat = Geo.latitude(p.z, scale);
         double lon = Geo.longitude(p.x, scale);
         int band = Geo.band(lat);

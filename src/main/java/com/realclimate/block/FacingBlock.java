@@ -8,7 +8,6 @@ import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.DirectionProperty;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockBehaviour;
-import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.block.Mirror;
 import net.minecraft.world.level.block.Rotation;
@@ -17,7 +16,7 @@ import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.VoxelShape;
 import net.minecraft.world.phys.shapes.Shapes;
 
-public abstract class FacingBlock extends Block {
+public class FacingBlock extends Block {
     public static final DirectionProperty FACING = BlockStateProperties.HORIZONTAL_FACING;
     protected final VoxelShape shape;
 
@@ -41,14 +40,17 @@ public abstract class FacingBlock extends Block {
     }
 
     @Override
-    public BlockState rotate(BlockState s, Rotation r) { return s.setValue(FACING, r.rotate(s.getValue(FACING))); }
+    public BlockState rotate(BlockState s, Rotation r) {
+        return s.setValue(FACING, r.rotate(s.getValue(FACING)));
+    }
 
     @Override
-    public BlockState mirror(BlockState s, Mirror m) { return s.rotate(m.getRotation(s.getValue(FACING))); }
+    public BlockState mirror(BlockState s, Mirror m) {
+        return s.rotate(m.getRotation(s.getValue(FACING)));
+    }
 
     @Override
-    public VoxelShape getShape(BlockState s, BlockGetter g, BlockPos p, CollisionContext c) { return shape; }
-
-    @Override
-    public BlockEntity newBlockEntity(BlockPos p, BlockState st) { return null; }
+    public VoxelShape getShape(BlockState s, BlockGetter g, BlockPos p, CollisionContext c) {
+        return shape;
+    }
 }

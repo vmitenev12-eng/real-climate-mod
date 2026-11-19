@@ -1,6 +1,7 @@
 package com.realclimate.tileentity;
 
 import com.realclimate.block.ACIndoorBlock;
+import com.realclimate.registry.ModBlockEntities;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -37,8 +38,10 @@ public class ACIndoorBlockEntity extends BlockEntity {
     @Override
     public void load(CompoundTag tag) {
         super.load(tag);
-        if (tag.contains("LinkedX")) {
+        if (tag.contains("LinkedX") && tag.contains("LinkedY") && tag.contains("LinkedZ")) {
             linkedOutdoor = new BlockPos(tag.getInt("LinkedX"), tag.getInt("LinkedY"), tag.getInt("LinkedZ"));
+        } else {
+            linkedOutdoor = null;
         }
         enabled = tag.getBoolean("Enabled");
     }

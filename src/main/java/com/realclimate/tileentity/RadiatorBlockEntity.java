@@ -1,6 +1,7 @@
 package com.realclimate.tileentity;
 
 import com.realclimate.block.RadiatorBlock;
+import com.realclimate.registry.ModBlockEntities;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -36,10 +37,6 @@ public class RadiatorBlockEntity extends BlockEntity {
         if (!be.isEnabled()) return;
         double heat = be.heatBuffer;
         be.heatBuffer = 0;
-        if (Math.abs(heat) > 0.01) {
-            level.setBlock(pos, state.setValue(RadiatorBlock.ACTIVE, Math.abs(heat) > 0.1), 3);
-        } else {
-            level.setBlock(pos, state.setValue(RadiatorBlock.ACTIVE, false), 3);
-        }
+        level.setBlock(pos, state.setValue(RadiatorBlock.ACTIVE, Math.abs(heat) > 0.1), 3);
     }
 }

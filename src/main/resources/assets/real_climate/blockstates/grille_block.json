@@ -1,0 +1,12 @@
+{
+  "variants": {
+    "facing=north,open=false": { "model": "real_climate:block/vent_ceiling_grille" },
+    "facing=east,open=false": { "model": "real_climate:block/vent_ceiling_grille", "y": 90 },
+    "facing=south,open=false": { "model": "real_climate:block/vent_ceiling_grille", "y": 180 },
+    "facing=west,open=false": { "model": "real_climate:block/vent_ceiling_grille", "y": 270 },
+    "facing=north,open=true": { "model": "real_climate:block/vent_ceiling_grille" },
+    "facing=east,open=true": { "model": "real_climate:block/vent_ceiling_grille", "y": 90 },
+    "facing=south,open=true": { "model": "real_climate:block/vent_ceiling_grille", "y": 180 },
+    "facing=west,open=true": { "model": "real_climate:block/vent_ceiling_grille", "y": 270 }
+  }
+}

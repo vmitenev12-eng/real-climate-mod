@@ -59,25 +59,32 @@ public final class BodyTemperature {
     /** Тепло от открытого огня, лавы, печей рядом (радиус 3). */
     private static double heatNearby(Level lv, BlockPos c) {
         double heat = 0;
+        boolean enclosed = !lv.canSeeSky(c);
         BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
-        for (int dx = -3; dx <= 3; dx++)
-            for (int dy = -2; dy <= 2; dy++)
-                for (int dz = -3; dz <= 3; dz++) {
+        for (int dx = -15; dx <= 15; dx++)
+            for (int dy = -8; dy <= 8; dy++)
+                for (int dz = -15; dz <= 15; dz++) {
+                    int manhattan = Math.abs(dx) + Math.abs(dy) + Math.abs(dz);
+                    if (manhattan > 15) continue;
                     m.set(c.getX() + dx, c.getY() + dy, c.getZ() + dz);
                     BlockState s = lv.getBlockState(m);
                     if (s.isAir()) continue;
+
                     double w = 0;
-                    if (s.is(Blocks.LAVA)) w = 6;
-                    else if (s.is(BlockTags.FIRE)) w = 4;
+                    if (s.is(Blocks.LAVA)) w = enclosed ? 8 : 4;
+                    else if (s.is(BlockTags.FIRE)) w = enclosed ? 6 : 3;
                     else if (s.is(BlockTags.CAMPFIRES) && s.hasProperty(net.minecraft.world.level.block.CampfireBlock.LIT)
-                            && s.getValue(net.minecraft.world.level.block.CampfireBlock.LIT)) w = 5;
+                            && s.getValue(net.minecraft.world.level.block.CampfireBlock.LIT)) w = enclosed ? 7 : 4;
                     else if ((s.is(Blocks.FURNACE) || s.is(Blocks.BLAST_FURNACE) || s.is(Blocks.SMOKER))
                             && s.hasProperty(net.minecraft.world.level.block.state.properties.BlockStateProperties.LIT)
-                            && s.getValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.LIT)) w = 3;
-                    else if (s.is(Blocks.TORCH) || s.is(Blocks.WALL_TORCH)) w = 0.5;
+                            && s.getValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.LIT)) w = enclosed ? 5 : 2;
+                    else if (s.is(Blocks.TORCH) || s.is(Blocks.WALL_TORCH)) w = enclosed ? 1.0 : 0.5;
+                    else if (s.is(com.realclimate.registry.ModBlocks.RADIATOR.get())
+                            && s.hasProperty(com.realclimate.block.RadiatorBlock.ACTIVE)
+                            && s.getValue(com.realclimate.block.RadiatorBlock.ACTIVE)) w = enclosed ? 12 : 5;
+
                     if (w > 0) {
-                        double dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-                        heat += w * (1.0 - Math.min(1.0, dist / 4.5));
+                        heat += w * (1.0 - Math.min(1.0, manhattan / 16.0));
                     }
                 }
         return Math.min(heat, 25.0);

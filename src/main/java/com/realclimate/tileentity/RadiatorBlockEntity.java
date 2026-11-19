@@ -7,6 +7,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.Level;
+import com.realclimate.climate.ClimateService;
 
 public class RadiatorBlockEntity extends BlockEntity {
     private boolean enabled = true;
@@ -39,13 +40,20 @@ public class RadiatorBlockEntity extends BlockEntity {
     }
 
     public static void serverTick(Level level, BlockPos pos, BlockState state, RadiatorBlockEntity be) {
-        if (!be.isEnabled()) return;
-        double heat = be.heatBuffer;
-        be.heatBuffer = 0;
-        if (Math.abs(heat) > 0.01) {
-            level.setBlock(pos, state.setValue(RadiatorBlock.ACTIVE, Math.abs(heat) > 0.1), 3);
-        } else {
-            level.setBlock(pos, state.setValue(RadiatorBlock.ACTIVE, false), 3);
+        if (!be.isEnabled()) {
+            if (state.getValue(RadiatorBlock.ACTIVE)) {
+                level.setBlock(pos, state.setValue(RadiatorBlock.ACTIVE, false), 3);
+            }
+            return;
+        }
+        if (level.getGameTime() % 20 != 0) return;
+
+        double outside = ClimateService.getTemperature(level, pos);
+        double neededHeat = Math.max(0.0, be.getTargetTemp() - outside);
+        be.heatBuffer = neededHeat;
+        boolean active = neededHeat > 0.5;
+        if (state.getValue(RadiatorBlock.ACTIVE) != active) {
+            level.setBlock(pos, state.setValue(RadiatorBlock.ACTIVE, active), 3);
         }
     }
 }

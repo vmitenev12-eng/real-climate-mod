@@ -1,0 +1,12 @@
+{
+  "variants": {
+    "facing=north,sealed=false": { "model": "real_climate:block/vent_straight" },
+    "facing=east,sealed=false": { "model": "real_climate:block/vent_straight", "y": 90 },
+    "facing=south,sealed=false": { "model": "real_climate:block/vent_straight", "y": 180 },
+    "facing=west,sealed=false": { "model": "real_climate:block/vent_straight", "y": 270 },
+    "facing=north,sealed=true": { "model": "real_climate:block/vent_straight" },
+    "facing=east,sealed=true": { "model": "real_climate:block/vent_straight", "y": 90 },
+    "facing=south,sealed=true": { "model": "real_climate:block/vent_straight", "y": 180 },
+    "facing=west,sealed=true": { "model": "real_climate:block/vent_straight", "y": 270 }
+  }
+}

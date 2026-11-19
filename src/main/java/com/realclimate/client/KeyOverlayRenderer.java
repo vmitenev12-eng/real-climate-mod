@@ -75,18 +75,30 @@ public final class KeyOverlayRenderer {
         double insulation = BodyTemperature.insulation(mc.player);
 
         int h = e.getGuiGraphics().guiHeight();
-        e.getGuiGraphics().drawString(mc.font,
-                Component.literal(String.format("Тело: %.1f°C  |  Воздух: %.1f°C  |  Утепление: %.0f%%",
-                        body, ambient, insulation * 100.0)),
-                10, h - 18, 0xFFFFFFFF, true);
+        int w = e.getGuiGraphics().guiWidth();
+        if (w < 320) {
+            e.getGuiGraphics().drawString(mc.font, Component.literal(String.format("Тело %.1f°C", body)),
+                    6, h - 32, 0xFFFFFFFF, true);
+            e.getGuiGraphics().drawString(mc.font, Component.literal(String.format("Воздух %.1f°C", ambient)),
+                    6, h - 22, 0xFFFFFFFF, true);
+            e.getGuiGraphics().drawString(mc.font, Component.literal(String.format("Тепло %.0f%%", insulation * 100.0)),
+                    6, h - 12, 0xFFFFFFFF, true);
+        } else {
+            e.getGuiGraphics().drawString(mc.font,
+                    Component.literal(String.format("Тело: %.1f°C  |  Воздух: %.1f°C  |  Утепление: %.0f%%",
+                            body, ambient, insulation * 100.0)),
+                    10, h - 18, 0xFFFFFFFF, true);
+        }
 
         var held = mc.player.getMainHandItem();
         if (held.isEmpty()) return;
         String itemId = BuiltInRegistries.ITEM.getKey(held.getItem()).toString();
         if (!"real_climate:installation_key".equals(itemId)) return;
 
-        e.getGuiGraphics().drawString(mc.font,
-                Component.literal("ПКМ: выбрать наружный и внутренний блок; Shift+ПКМ: разорвать связь"),
-                10, h - 34, 0xFFFFFFFF, true);
+        String keyHint = w < 320
+                ? "Shift+ПКМ: разорвать"
+                : "ПКМ: связать; Shift+ПКМ: разорвать";
+        e.getGuiGraphics().drawString(mc.font, Component.literal(keyHint),
+                6, w < 320 ? h - 42 : h - 34, 0xFFFFFFFF, true);
     }
 }

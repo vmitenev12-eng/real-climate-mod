@@ -3,7 +3,6 @@ package com.realclimate.block;
 import com.realclimate.tileentity.VentBlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.BooleanProperty;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockBehaviour;
@@ -15,12 +14,10 @@ import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.block.Mirror;
 import net.minecraft.world.level.block.Rotation;
-import net.minecraft.world.level.material.FluidState;
-import net.minecraft.world.level.material.Fluids;
 import net.minecraft.tags.BlockTags;
 
 public class VentBlock extends FacingBlock {
-    public static final BooleanProperty SEALED = BlockStateProperties.WATERLOGGED;
+    public static final BooleanProperty SEALED = BooleanProperty.create("sealed");
     protected static final VoxelShape SHAPE = Shapes.block();
 
     public VentBlock(Properties props) {
@@ -49,11 +46,6 @@ public class VentBlock extends FacingBlock {
 
     @Override
     public BlockEntity newBlockEntity(BlockPos p, BlockState st) { return new VentBlockEntity(p, st); }
-
-    @Override
-    public <T extends BlockEntity> BlockEntityType<T> getBlockEntityType() {
-        return (BlockEntityType<T>) net.minecraftforge.registries.ForgeRegistries.BLOCK_ENTITY_TYPES.getValue(net.minecraft.core.Registry.BLOCK_ENTITY_TYPE.key(), net.minecraft.core.ResourceLocation.parse("real_climate:vent"));
-    }
 
     public static boolean isVent(BlockGetter g, BlockPos p) {
         return g.getBlockState(p).getBlock() instanceof VentBlock || g.getBlockState(p).getBlock() instanceof GrilleBlock;

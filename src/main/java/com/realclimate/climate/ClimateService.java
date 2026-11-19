@@ -3,19 +3,19 @@ package com.realclimate.climate;
 import com.realclimate.RealClimate;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.biome.Biome;
-import net.minecraft.world.level.biome.Biomes;
+import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-@Mod.EventBusSubscriber(modid = RealClimate.MODID)
+@Mod.EventBusSubscriber(modid = RealClimate.MODID, value = Dist.DEDICATED_SERVER)
 public final class ClimateService {
     private static final Map<UUID, Double> bodyCache = new ConcurrentHashMap<>();
     private static double globalScale = 1.0;
@@ -26,13 +26,13 @@ public final class ClimateService {
     public static void start(long seed) {
         globalScale = 1.0 + (seed % 1000) / 10000.0;
         started = true;
-        MinecraftForge.EVENT_BUS.register(new ClimateTicker());
+        FMLJavaModLoadingContext.get().getModEventBus().register(new ClimateTicker());
     }
 
     public static void stop() {
         started = false;
         bodyCache.clear();
-        MinecraftForge.EVENT_BUS.unregister(new ClimateTicker());
+        FMLJavaModLoadingContext.get().getModEventBus().unregister(new ClimateTicker());
     }
 
     public static double scale() {
@@ -56,7 +56,6 @@ public final class ClimateService {
     }
 
     public static Forecast forecast(int band) {
-        // Упрощённый прогноз на основе полосы климата
         double base = switch (band) {
             case 0 -> -10.0; // Арктика
             case 1 -> 0.0;   // Субарктика
@@ -79,7 +78,6 @@ public final class ClimateService {
         @SubscribeEvent
         public void onTick(TickEvent.WorldTickEvent e) {
             if (!started || e.phase != TickEvent.Phase.END) return;
-            // Периодическое обновление климата
         }
     }
 }

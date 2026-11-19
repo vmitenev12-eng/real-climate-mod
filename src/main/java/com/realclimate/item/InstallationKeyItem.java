@@ -2,6 +2,7 @@ package com.realclimate.item;
 
 import com.realclimate.tileentity.ACIndoorBlockEntity;
 import com.realclimate.tileentity.ACOutdoorBlockEntity;
+import com.realclimate.tileentity.ControlPanelBlockEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
@@ -33,7 +34,11 @@ public class InstallationKeyItem extends Item {
         if (player != null && player.isShiftKeyDown()) {
             if (be instanceof ACOutdoorBlockEntity outdoor) {
                 outdoor.unlinkAll();
+                outdoor.unlinkAllPanels();
                 player.displayClientMessage(Component.literal("Связи наружного блока сброшены"), true);
+            } else if (be instanceof ControlPanelBlockEntity panel) {
+                panel.unlinkAll();
+                player.displayClientMessage(Component.literal("Связи пульта сброшены"), true);
             } else if (be instanceof ACIndoorBlockEntity indoor && indoor.getLinkedOutdoor() != null) {
                 BlockPos outdoorPos = indoor.getLinkedOutdoor();
                 BlockEntity outdoorBe = level.getBlockEntity(outdoorPos);
@@ -48,6 +53,27 @@ public class InstallationKeyItem extends Item {
         if (be instanceof ACOutdoorBlockEntity outdoor) {
             setSelection(stack, pos);
             if (player != null) player.displayClientMessage(Component.literal("Наружный блок выбран. Выберите внутренний"), true);
+            return InteractionResult.CONSUME;
+        }
+
+        if (be instanceof ControlPanelBlockEntity panel) {
+            BlockPos outdoorPos = getSelection(stack);
+            if (outdoorPos == null) {
+                if (player != null) player.displayClientMessage(Component.literal("Сначала ПКМ по наружному блоку кондиционера"), true);
+                return InteractionResult.CONSUME;
+            }
+            BlockEntity outdoorBe = level.getBlockEntity(outdoorPos);
+            if (!(outdoorBe instanceof ACOutdoorBlockEntity outdoor)) {
+                clearSelection(stack);
+                if (player != null) player.displayClientMessage(Component.literal("Наружный блок не найден"), true);
+                return InteractionResult.CONSUME;
+            }
+            outdoor.linkPanel(pos);
+            panel.linkOutdoor(outdoorPos);
+            outdoor.setChanged();
+            panel.setChanged();
+            if (player != null) player.displayClientMessage(Component.literal("Пульт подключен к наружному кондиционеру"), true);
+            clearSelection(stack);
             return InteractionResult.CONSUME;
         }
 

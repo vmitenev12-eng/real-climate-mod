@@ -12,6 +12,7 @@ public class ACIndoorBlockEntity extends BlockEntity {
     private BlockPos linkedOutdoor;
     private boolean enabled = true;
     private double coolBuffer = 0.0;
+    private double targetTemp = 22.0;
 
     public ACIndoorBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntities.AC_INDOOR.get(), pos, state);
@@ -22,6 +23,8 @@ public class ACIndoorBlockEntity extends BlockEntity {
     public boolean isEnabled() { return enabled; }
     public void setEnabled(boolean e) { this.enabled = e; setChanged(); }
     public double getCoolBuffer() { return coolBuffer; }
+    public double getTargetTemp() { return targetTemp; }
+    public void setTargetTemp(double targetTemp) { this.targetTemp = Math.max(-20.0, Math.min(95.0, targetTemp)); setChanged(); }
     public void addCool(double c) { this.coolBuffer += c; }
 
     @Override
@@ -33,6 +36,7 @@ public class ACIndoorBlockEntity extends BlockEntity {
             tag.putInt("LinkedZ", linkedOutdoor.getZ());
         }
         tag.putBoolean("Enabled", enabled);
+        tag.putDouble("TargetTemp", targetTemp);
     }
 
     @Override
@@ -42,6 +46,7 @@ public class ACIndoorBlockEntity extends BlockEntity {
             linkedOutdoor = new BlockPos(tag.getInt("LinkedX"), tag.getInt("LinkedY"), tag.getInt("LinkedZ"));
         }
         enabled = tag.getBoolean("Enabled");
+        targetTemp = Math.max(-20.0, Math.min(95.0, tag.getDouble("TargetTemp")));
     }
 
     public static void serverTick(Level level, BlockPos pos, BlockState state, ACIndoorBlockEntity be) {

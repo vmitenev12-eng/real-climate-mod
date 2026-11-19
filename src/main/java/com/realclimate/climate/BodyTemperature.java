@@ -79,6 +79,20 @@ public final class BodyTemperature {
                             && s.hasProperty(net.minecraft.world.level.block.state.properties.BlockStateProperties.LIT)
                             && s.getValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.LIT)) w = enclosed ? 5 : 2;
                     else if (s.is(Blocks.TORCH) || s.is(Blocks.WALL_TORCH)) w = enclosed ? 1.0 : 0.5;
+                    else if (s.is(com.realclimate.registry.ModBlocks.AC_INDOOR.get())) {
+                        net.minecraft.world.level.block.entity.BlockEntity entity = lv.getBlockEntity(m);
+                        if (entity instanceof com.realclimate.tileentity.ACIndoorBlockEntity indoor
+                                && indoor.isEnabled() && stateValue(s, com.realclimate.block.ACIndoorBlock.ACTIVE)) {
+                            w = (indoor.getTargetTemp() - 20.0) * 0.35 * (enclosed ? 1.0 : 0.5);
+                        }
+                    }
+                    else if (s.is(com.realclimate.registry.ModBlocks.GRILLE_BLOCK.get())) {
+                        net.minecraft.world.level.block.entity.BlockEntity entity = lv.getBlockEntity(m);
+                        if (entity instanceof com.realclimate.tileentity.GrilleBlockEntity grille
+                                && grille.isOpen()) {
+                            w = (grille.getTargetTemp() - 20.0) * 0.28 * (enclosed ? 1.0 : 0.4);
+                        }
+                    }
                     else if (s.is(com.realclimate.registry.ModBlocks.RADIATOR.get())
                             && s.hasProperty(com.realclimate.block.RadiatorBlock.ACTIVE)
                             && s.getValue(com.realclimate.block.RadiatorBlock.ACTIVE)) w = enclosed ? 12 : 5;
@@ -87,7 +101,11 @@ public final class BodyTemperature {
                         heat += w * (1.0 - Math.min(1.0, manhattan / 16.0));
                     }
                 }
-        return Math.min(heat, 25.0);
+        return Math.max(-25.0, Math.min(25.0, heat));
+    }
+
+    private static boolean stateValue(BlockState state, net.minecraft.world.level.block.state.properties.BooleanProperty property) {
+        return state.hasProperty(property) && state.getValue(property);
     }
 
     /** Теплоизоляция брони: 0..1. */

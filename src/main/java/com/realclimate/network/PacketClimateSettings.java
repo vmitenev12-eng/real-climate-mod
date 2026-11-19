@@ -2,6 +2,8 @@ package com.realclimate.network;
 
 import com.realclimate.tileentity.ACOutdoorBlockEntity;
 import com.realclimate.tileentity.RadiatorBlockEntity;
+import com.realclimate.tileentity.ControlPanelBlockEntity;
+import com.realclimate.tileentity.ACIndoorBlockEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerPlayer;
@@ -46,6 +48,19 @@ public class PacketClimateSettings {
             } else if (blockEntity instanceof RadiatorBlockEntity radiator) {
                 radiator.setEnabled(message.enabled);
                 radiator.setTargetTemp(target);
+            } else if (blockEntity instanceof ControlPanelBlockEntity panel) {
+                panel.setEnabled(message.enabled);
+                panel.setTargetTemp(target);
+                for (BlockPos outdoorPos : panel.getLinkedOutdoors()) {
+                    BlockEntity outdoorEntity = player.serverLevel().getBlockEntity(outdoorPos);
+                    if (outdoorEntity instanceof ACOutdoorBlockEntity outdoor) {
+                        outdoor.setEnabled(message.enabled);
+                        outdoor.setTargetTemp(target);
+                    }
+                }
+            } else if (blockEntity instanceof ACIndoorBlockEntity indoor) {
+                indoor.setEnabled(message.enabled);
+                indoor.setTargetTemp(target);
             }
         });
         context.setPacketHandled(true);

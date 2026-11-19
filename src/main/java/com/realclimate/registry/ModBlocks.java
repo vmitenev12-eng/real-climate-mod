@@ -28,6 +28,7 @@ public final class ModBlocks {
     public static final RegistryObject<Block> RADIATOR;
     public static final RegistryObject<Block> VENT_BLOCK;
     public static final RegistryObject<Block> GRILLE_BLOCK;
+    public static final RegistryObject<Block> CONTROL_PANEL;
 
     private static BlockBehaviour.Properties metal() {
         return BlockBehaviour.Properties.of().strength(2.0f, 6.0f).sound(SoundType.METAL).noOcclusion().requiresCorrectToolForDrops();
@@ -62,6 +63,7 @@ public final class ModBlocks {
         RADIATOR = reg("radiator", () -> new RadiatorBlock(metal()), true);
         VENT_BLOCK = reg("vent_block", () -> new VentBlock(metal()), true);
         GRILLE_BLOCK = reg("grille_block", () -> new GrilleBlock(metal()), true);
+        CONTROL_PANEL = reg("control_panel", () -> new ControlPanelBlock(metal()), true);
     }
 
     private ModBlocks() {}

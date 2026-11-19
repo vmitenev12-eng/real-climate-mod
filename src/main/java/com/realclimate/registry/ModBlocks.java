@@ -1,9 +1,9 @@
 package com.realclimate.registry;
 
 import com.realclimate.RealClimate;
-import com.realclimate.block.FacingBlock;
-import net.minecraft.world.item.BlockItem;
+import com.realclimate.block.*;
 import com.realclimate.item.HammerItem;
+import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.SoundType;
@@ -14,35 +14,54 @@ import net.minecraftforge.registries.RegistryObject;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.function.Supplier;
 
 public final class ModBlocks {
     public static final DeferredRegister<Block> BLOCKS = DeferredRegister.create(ForgeRegistries.BLOCKS, RealClimate.MODID);
     public static final DeferredRegister<Item> ITEMS = DeferredRegister.create(ForgeRegistries.ITEMS, RealClimate.MODID);
-    /** Все блоки мода в порядке регистрации (для вкладки креатива). */
     public static final Map<String, RegistryObject<Block>> ALL = new LinkedHashMap<>();
 
     public static final RegistryObject<Item> HAMMER = ITEMS.register("hammer", () -> new HammerItem(new Item.Properties().stacksTo(1)));
+
+    public static final RegistryObject<Block> AC_OUTDOOR;
+    public static final RegistryObject<Block> AC_INDOOR;
+    public static final RegistryObject<Block> RADIATOR;
+    public static final RegistryObject<Block> VENT_BLOCK;
+    public static final RegistryObject<Block> GRILLE_BLOCK;
 
     private static BlockBehaviour.Properties metal() {
         return BlockBehaviour.Properties.of().strength(2.0f, 6.0f).sound(SoundType.METAL).noOcclusion().requiresCorrectToolForDrops();
     }
 
-    private static RegistryObject<Block> reg(String id) {
-        RegistryObject<Block> b = BLOCKS.register(id, () -> new FacingBlock(metal()));
-        ITEMS.register(id, () -> new BlockItem(b.get(), new Item.Properties()));
-        ALL.put(id, b);
+    private static <T extends Block> RegistryObject<T> reg(String id, Supplier<T> block, boolean registerItem) {
+        RegistryObject<T> b = BLOCKS.register(id, block);
+        if (registerItem) {
+            ITEMS.register(id, () -> new BlockItem(b.get(), new Item.Properties()));
+        }
+        ALL.put(id, (RegistryObject<Block>) (RegistryObject<?>) b);
         return b;
     }
 
     static {
-        // Вентиляция (текстура 1000388937 -> vent_metal)
-        reg("vent_straight"); reg("vent_straight_up");
-        reg("vent_elbow_side"); reg("vent_elbow_up"); reg("vent_elbow_down");
-        reg("vent_tee_side"); reg("vent_tee_up"); reg("vent_tee_down");
-        reg("vent_cross_side"); reg("vent_cross_up");
-        reg("vent_ceiling_grille");
-        // Оборудование
-        reg("ac_indoor"); reg("ac_outdoor"); reg("radiator");
+        // Вентиляция (FacingBlock без TE)
+        reg("vent_straight", () -> new FacingBlock(metal()), true);
+        reg("vent_straight_up", () -> new FacingBlock(metal()), true);
+        reg("vent_elbow_side", () -> new FacingBlock(metal()), true);
+        reg("vent_elbow_up", () -> new FacingBlock(metal()), true);
+        reg("vent_elbow_down", () -> new FacingBlock(metal()), true);
+        reg("vent_tee_side", () -> new FacingBlock(metal()), true);
+        reg("vent_tee_up", () -> new FacingBlock(metal()), true);
+        reg("vent_tee_down", () -> new FacingBlock(metal()), true);
+        reg("vent_cross_side", () -> new FacingBlock(metal()), true);
+        reg("vent_cross_up", () -> new FacingBlock(metal()), true);
+        reg("vent_ceiling_grille", () -> new FacingBlock(metal()), true);
+
+        // Оборудование (с TE)
+        AC_OUTDOOR = reg("ac_outdoor", () -> new ACOutdoorBlock(metal()), true);
+        AC_INDOOR = reg("ac_indoor", () -> new ACIndoorBlock(metal()), true);
+        RADIATOR = reg("radiator", () -> new RadiatorBlock(metal()), true);
+        VENT_BLOCK = reg("vent_block", () -> new VentBlock(metal()), true);
+        GRILLE_BLOCK = reg("grille_block", () -> new GrilleBlock(metal()), true);
     }
 
     private ModBlocks() {}

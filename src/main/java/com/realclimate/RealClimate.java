@@ -12,7 +12,7 @@ import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.config.ModConfig;
-import org.spongepowered.asm.launch.Mixins;
+import org.spongepowered.asm.mixin.Mixins;
 
 @Mod(RealClimate.MODID)
 public class RealClimate {

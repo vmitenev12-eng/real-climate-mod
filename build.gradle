@@ -42,8 +42,9 @@ dependencies {
     minecraft 'net.minecraftforge:forge:1.20.1-47.4.2'
 
     // Миксины (осадки по реальной температуре): процессор аннотаций для refmap
-    // и библиотека в рантайме. Без внешних зависимостей у самого мода.
+    // и библиотека в compile- и runtime-classpath. Без внешних зависимостей у самого мода.
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
+    implementation 'org.spongepowered:mixin:0.8.5'
     minecraftLibrary 'org.spongepowered:mixin:0.8.5'
 }
 

@@ -19,6 +19,7 @@
  "item.real_climate.hammer": "Молоточек",
  "item.real_climate.installation_key": "Ключ монтажника",
  "block.real_climate.control_panel": "Настенный пульт управления",
+ "block.real_climate.thermometer": "Термодатчик",
  "tooltip.real_climate.link_ac": "ПКМ по внутреннему блоку для привязки",
  "gui.real_climate.link_title": "Связь кондиционера",
  "gui.real_climate.link_outdoor": "Наружный блок",

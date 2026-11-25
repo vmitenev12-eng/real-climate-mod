@@ -17,6 +17,7 @@
   "real_climate:radiator",
   "real_climate:vent_block",
   "real_climate:grille_block",
-  "real_climate:control_panel"
+  "real_climate:control_panel",
+  "real_climate:thermometer"
  ]
 }

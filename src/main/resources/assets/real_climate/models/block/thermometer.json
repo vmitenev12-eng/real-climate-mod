@@ -1,0 +1,32 @@
+{
+  "textures": {
+    "particle": "real_climate:block/vent_metal",
+    "body": "real_climate:block/vent_metal"
+  },
+  "elements": [
+    {
+      "from": [5, 4, 12],
+      "to": [11, 12, 16],
+      "faces": {
+        "north": { "texture": "#body" },
+        "east": { "texture": "#body" },
+        "south": { "texture": "#body" },
+        "west": { "texture": "#body" },
+        "up": { "texture": "#body" },
+        "down": { "texture": "#body" }
+      }
+    },
+    {
+      "from": [6.5, 6.5, 10.5],
+      "to": [9.5, 9.5, 12],
+      "faces": {
+        "north": { "texture": "#body" },
+        "east": { "texture": "#body" },
+        "south": { "texture": "#body" },
+        "west": { "texture": "#body" },
+        "up": { "texture": "#body" },
+        "down": { "texture": "#body" }
+      }
+    }
+  ]
+}

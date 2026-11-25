@@ -155,6 +155,9 @@ public class ACOutdoorBlockEntity extends BlockEntity {
             if (!level.isLoaded(panelPos)) continue;
             if (level.getBlockEntity(panelPos) instanceof ControlPanelBlockEntity panel
                     && panel.isEnabled() && panel.getLinkedOutdoors().contains(worldPosition)) {
+                // Авторежим: пульт по показаниям термодатчиков сам вычисляет
+                // выходную температуру и записывает её в targetTemp этого блока.
+                if (panel.isAutoMode()) break;
                 return panel.getTargetTemp();
             }
         }

@@ -3,6 +3,7 @@ package com.realclimate.item;
 import com.realclimate.tileentity.ACIndoorBlockEntity;
 import com.realclimate.tileentity.ACOutdoorBlockEntity;
 import com.realclimate.tileentity.ControlPanelBlockEntity;
+import com.realclimate.tileentity.ThermometerBlockEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.InteractionResult;
@@ -15,6 +16,7 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 
 public class InstallationKeyItem extends Item {
     private static final String SELECTION_KEY = "real_climate_selected_outdoor";
+    private static final String SENSOR_SELECTION_KEY = "real_climate_selected_sensor";
 
     public InstallationKeyItem(Properties props) { super(props); }
 
@@ -57,18 +59,42 @@ public class InstallationKeyItem extends Item {
                 indoor.setLinkedOutdoor(null);
                 sync(level, pos, indoor);
                 player.displayClientMessage(Component.literal("Связь внутреннего блока разорвана"), true);
+            } else if (be instanceof ThermometerBlockEntity) {
+                clearSensorSelection(player);
+                player.displayClientMessage(Component.literal("Выбор термодатчика сброшен. Привязку к пульту снимайте Shift+ПКМ по пульту"), true);
             }
             clearSelection(player);
             return InteractionResult.CONSUME;
         }
 
         if (be instanceof ACOutdoorBlockEntity outdoor) {
+            clearSensorSelection(player);
             setSelection(player, pos);
             player.displayClientMessage(Component.literal("Наружный блок выбран. Выберите пульт или внутренний блок"), true);
             return InteractionResult.CONSUME;
         }
 
+        if (be instanceof ThermometerBlockEntity) {
+            clearSelection(player);
+            setSensorSelection(player, pos);
+            player.displayClientMessage(Component.literal("Термодатчик выбран. Теперь ПКМ по пульту управления"), true);
+            return InteractionResult.CONSUME;
+        }
+
         if (be instanceof ControlPanelBlockEntity panel) {
+            BlockPos sensorPos = getSensorSelection(player);
+            if (sensorPos != null) {
+                clearSensorSelection(player);
+                if (!(level.getBlockEntity(sensorPos) instanceof ThermometerBlockEntity)) {
+                    player.displayClientMessage(Component.literal("Термодатчик не найден или выгружен"), true);
+                    return InteractionResult.CONSUME;
+                }
+                panel.linkThermometer(sensorPos);
+                sync(level, pos, panel);
+                player.displayClientMessage(Component.literal("Термодатчик привязан к пульту"), true);
+                return InteractionResult.CONSUME;
+            }
+
             BlockPos outdoorPos = getSelection(player);
             if (outdoorPos == null) {
                 player.displayClientMessage(Component.literal("Сначала ПКМ по наружному блоку кондиционера"), true);
@@ -92,6 +118,7 @@ public class InstallationKeyItem extends Item {
         }
 
         if (be instanceof ACIndoorBlockEntity indoor) {
+            clearSensorSelection(player);
             BlockPos outdoorPos = getSelection(player);
             if (outdoorPos == null) {
                 player.displayClientMessage(Component.literal("Сначала ПКМ по наружному блоку кондиционера"), true);
@@ -135,6 +162,19 @@ public class InstallationKeyItem extends Item {
 
     private static void clearSelection(Player player) {
         player.getPersistentData().remove(SELECTION_KEY);
+    }
+
+    private static void setSensorSelection(Player player, BlockPos pos) {
+        player.getPersistentData().putLong(SENSOR_SELECTION_KEY, pos.asLong());
+    }
+
+    private static BlockPos getSensorSelection(Player player) {
+        return player.getPersistentData().contains(SENSOR_SELECTION_KEY)
+                ? BlockPos.of(player.getPersistentData().getLong(SENSOR_SELECTION_KEY)) : null;
+    }
+
+    private static void clearSensorSelection(Player player) {
+        player.getPersistentData().remove(SENSOR_SELECTION_KEY);
     }
 
     private static void sync(Level level, BlockPos pos, BlockEntity blockEntity) {

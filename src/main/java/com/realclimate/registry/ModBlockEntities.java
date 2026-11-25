@@ -27,6 +27,8 @@ public final class ModBlockEntities {
             register("grille", GrilleBlockEntity::new, ModBlocks.GRILLE_BLOCK);
     public static final RegistryObject<BlockEntityType<ControlPanelBlockEntity>> CONTROL_PANEL =
             register("control_panel", ControlPanelBlockEntity::new, ModBlocks.CONTROL_PANEL);
+    public static final RegistryObject<BlockEntityType<ThermometerBlockEntity>> THERMOMETER =
+            register("thermometer", ThermometerBlockEntity::new, ModBlocks.THERMOMETER);
 
     private static <T extends BlockEntity> RegistryObject<BlockEntityType<T>> register(
             String id, BlockEntityType.BlockEntitySupplier<T> factory,

@@ -19,6 +19,7 @@
  "item.real_climate.hammer": "Hammer",
  "item.real_climate.installation_key": "Installation Key",
  "block.real_climate.control_panel": "Wall Control Panel",
+ "block.real_climate.thermometer": "Thermometer",
  "tooltip.real_climate.link_ac": "Right-click indoor unit to link",
  "gui.real_climate.link_title": "AC Link",
  "gui.real_climate.link_outdoor": "Outdoor Unit",

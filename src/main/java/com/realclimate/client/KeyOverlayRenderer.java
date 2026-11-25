@@ -13,6 +13,7 @@ import net.minecraftforge.client.event.RenderLevelStageEvent;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.realclimate.tileentity.ACOutdoorBlockEntity;
+import com.realclimate.tileentity.ControlPanelBlockEntity;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.core.BlockPos;
 import net.minecraftforge.event.TickEvent;
@@ -64,13 +65,19 @@ public final class KeyOverlayRenderer {
                 var chunk = mc.level.getChunkSource().getChunk(chunkX, chunkZ, false);
                 if (chunk == null) continue;
                 for (var blockEntity : chunk.getBlockEntities().values()) {
-                    if (!(blockEntity instanceof ACOutdoorBlockEntity outdoor)) continue;
-                    BlockPos from = outdoor.getBlockPos();
-                    for (BlockPos indoorPos : outdoor.getLinkedIndoors()) {
-                        lines.add(new LinkLine(from, indoorPos));
-                    }
-                    for (BlockPos panelPos : outdoor.getLinkedPanels()) {
-                        lines.add(new LinkLine(from, panelPos));
+                    if (blockEntity instanceof ACOutdoorBlockEntity outdoor) {
+                        BlockPos from = outdoor.getBlockPos();
+                        for (BlockPos indoorPos : outdoor.getLinkedIndoors()) {
+                            lines.add(new LinkLine(from, indoorPos));
+                        }
+                        for (BlockPos panelPos : outdoor.getLinkedPanels()) {
+                            lines.add(new LinkLine(from, panelPos));
+                        }
+                    } else if (blockEntity instanceof ControlPanelBlockEntity panel) {
+                        BlockPos from = panel.getBlockPos();
+                        for (BlockPos sensorPos : panel.getLinkedThermometers()) {
+                            lines.add(new LinkLine(from, sensorPos));
+                        }
                     }
                 }
             }
@@ -117,18 +124,19 @@ public final class KeyOverlayRenderer {
 
         int h = e.getGuiGraphics().guiHeight();
         int w = e.getGuiGraphics().guiWidth();
+        // Текст поднят выше панели инструментов и брони, чтобы не перекрывать их.
         if (w < 320) {
             e.getGuiGraphics().drawString(mc.font, Component.literal(String.format("Тело %.1f°C", body)),
-                    6, h - 32, 0xFFFFFFFF, true);
+                    6, h - 84, 0xFFFFFFFF, true);
             e.getGuiGraphics().drawString(mc.font, Component.literal(String.format("Воздух %.1f°C", ambient)),
-                    6, h - 22, 0xFFFFFFFF, true);
+                    6, h - 74, 0xFFFFFFFF, true);
             e.getGuiGraphics().drawString(mc.font, Component.literal(String.format("Тепло %.0f%%", insulation * 100.0)),
-                    6, h - 12, 0xFFFFFFFF, true);
+                    6, h - 64, 0xFFFFFFFF, true);
         } else {
             e.getGuiGraphics().drawString(mc.font,
                     Component.literal(String.format("Тело: %.1f°C  |  Воздух: %.1f°C  |  Утепление: %.0f%%",
                             body, ambient, insulation * 100.0)),
-                    10, h - 18, 0xFFFFFFFF, true);
+                    10, h - 66, 0xFFFFFFFF, true);
         }
 
         if (!isHoldingInstallationKey(mc)) return;
@@ -137,7 +145,7 @@ public final class KeyOverlayRenderer {
                 ? "Shift+ПКМ: разорвать"
                 : "ПКМ: связать; Shift+ПКМ: разорвать";
         e.getGuiGraphics().drawString(mc.font, Component.literal(keyHint),
-                6, w < 320 ? h - 42 : h - 34, 0xFFFFFFFF, true);
+                6, w < 320 ? h - 94 : h - 78, 0xFFFFFFFF, true);
     }
 
     private static boolean isHoldingInstallationKey(Minecraft mc) {

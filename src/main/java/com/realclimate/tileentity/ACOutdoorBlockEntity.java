@@ -29,32 +29,41 @@ public class ACOutdoorBlockEntity extends BlockEntity {
         super(ModBlockEntities.AC_OUTDOOR.get(), pos, state);
     }
 
-    public void setLinkedIndoors(Set<BlockPos> indoors) { this.linkedIndoors.clear(); this.linkedIndoors.addAll(indoors); }
+    /** Сохранить и разослать клиентам обновление связок — иначе линии ключа не появятся. */
+    private void sync() {
+        setChanged();
+        if (level != null && !level.isClientSide) {
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+        }
+    }
+
+    public void setLinkedIndoors(Set<BlockPos> indoors) {
+        this.linkedIndoors.clear();
+        this.linkedIndoors.addAll(indoors);
+        sync();
+    }
     public Set<BlockPos> getLinkedIndoors() { return linkedIndoors; }
     public boolean linkIndoor(BlockPos pos) {
         if (linkedIndoors.size() >= 3 && !linkedIndoors.contains(pos)) return false;
         boolean changed = linkedIndoors.add(pos);
-        if (changed) setChanged();
+        if (changed) sync();
         return true;
     }
-    public void unlinkIndoor(BlockPos pos) { if (linkedIndoors.remove(pos)) setChanged(); }
-    public void unlinkAll() { if (!linkedIndoors.isEmpty()) { linkedIndoors.clear(); setChanged(); } }
+    public void unlinkIndoor(BlockPos pos) { if (linkedIndoors.remove(pos)) sync(); }
+    public void unlinkAll() { if (!linkedIndoors.isEmpty()) { linkedIndoors.clear(); sync(); } }
     public Set<BlockPos> getLinkedPanels() { return linkedPanels; }
-    public boolean linkPanel(BlockPos pos) { boolean changed = linkedPanels.add(pos); if (changed) setChanged(); return changed; }
-    public void unlinkPanel(BlockPos pos) { if (linkedPanels.remove(pos)) setChanged(); }
-    public void unlinkAllPanels() { if (!linkedPanels.isEmpty()) { linkedPanels.clear(); setChanged(); } }
+    public boolean linkPanel(BlockPos pos) { boolean changed = linkedPanels.add(pos); if (changed) sync(); return changed; }
+    public void unlinkPanel(BlockPos pos) { if (linkedPanels.remove(pos)) sync(); }
+    public void unlinkAllPanels() { if (!linkedPanels.isEmpty()) { linkedPanels.clear(); sync(); } }
 
     public boolean isEnabled() { return enabled; }
-    public void setEnabled(boolean e) { if (enabled != e) { enabled = e; setChanged(); } }
+    public void setEnabled(boolean e) { if (enabled != e) { enabled = e; sync(); } }
     public double getTargetTemp() { return targetTemp; }
     public void setTargetTemp(double t) {
         double clamped = Math.max(-20.0, Math.min(95.0, t));
         if (targetTemp != clamped) {
             targetTemp = clamped;
-            setChanged();
-            if (level != null && !level.isClientSide) {
-                level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
-            }
+            sync();
         }
     }
 

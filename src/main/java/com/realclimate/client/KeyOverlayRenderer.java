@@ -118,9 +118,11 @@ public final class KeyOverlayRenderer {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.level == null) return;
 
-        double body = BodyTemperature.get(mc.player);
-        double ambient = BodyTemperature.effectiveAmbient(mc.player);
-        double insulation = BodyTemperature.insulation(mc.player);
+        // HUD показывает серверные значения (приходят каждые 2 с), а не пересчёт
+        // на клиенте — датчик, пульт и интерфейс больше не расходятся.
+        double body = BodyTemperature.bodyDisplay(mc.player);
+        double ambient = BodyTemperature.ambientDisplay(mc.player);
+        double insulation = BodyTemperature.insulationDisplay(mc.player);
 
         int h = e.getGuiGraphics().guiHeight();
         int w = e.getGuiGraphics().guiWidth();

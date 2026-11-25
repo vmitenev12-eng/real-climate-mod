@@ -50,13 +50,13 @@ public final class ClimateService {
     }
 
     public static double getTemperature(Level level, BlockPos pos) {
+        // Единая температура мира: temperature() уже включает суточный ход
+        // по реальному времени. Раньше здесь diurnal добавлялся второй раз
+        // с часом из игрового времени (со сдвигом на 6 часов) — отсюда
+        // двойные амплитуды и скачки от блока к блоку.
         double temp = temperature(pos.getX(), pos.getZ(), pos.getY());
         if (level.isRaining()) temp -= level.isThundering() ? 5.0 : 3.0;
         if (level.isThundering()) temp -= 1.5;
-        long dayTime = level.getDayTime() % 24000L;
-        double localHours = dayTime / 1000.0;
-        temp += ClimateModel.diurnal(Geo.latitude(pos.getZ(), ClimateConfig.scale()), (int) localHours)
-                - ClimateModel.diurnal(Geo.latitude(pos.getZ(), ClimateConfig.scale()), 12);
         return temp;
     }
 

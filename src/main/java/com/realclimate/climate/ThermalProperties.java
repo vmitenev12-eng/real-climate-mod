@@ -25,12 +25,17 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * Толщина материала считается по форме коллизии блока: цельный блок кирпича
  * ведёт себя как метр кладки, а стенка из миниблоков (LittleTiles и подобных)
- * толщиной 1/32 метра проводит тепло ровно пропорционально своей толщине.
+ * толщиной 1/32 метра вносит сопротивление (1/32)/λ. Весь сэндвич ограждения
+ * (кирпич + утеплитель + сайдинг из миниблоков) считается лучом: сопротивления
+ * слоёв складываются, как в реальной стене.
  * Ни исходники Minecraft, ни код других модов не требуются — только состояние мира.
  */
 public final class ThermalProperties {
     /** Неизвестный кладочный материал, Вт/(м·К). */
     public static final double DEFAULT_CONDUCTIVITY = 1.0;
+
+    /** На сколько блоков вглубь ограждения смотрит луч сэндвича. */
+    private static final int MAX_SANDWICH_DEPTH = 8;
 
     private static final Map<ResourceLocation, Double> OVERRIDES = new ConcurrentHashMap<>();
 
@@ -52,9 +57,14 @@ public final class ThermalProperties {
     }
 
     /**
-     * Теплопроводность грани блока в заданном направлении, Вт/К на грань:
-     * площадь соприкосновения × λ / толщина материала вдоль направления.
-     * Для пустой коллизии (открытые двери, решётки) — 0.
+     * Теплопроводность грани блока в заданном направлении (от помещения наружу),
+     * Вт/К на грань: площадь проёма / полное сопротивление сэндвича R = Σ толщина_i / λ_i.
+     *
+     * Луч идёт от самого внутреннего слоя (со стороны помещения — воздух) через
+     * все следующие сплошные слои, пока не встретит воздух. Внешние слои сэндвича
+     * возвращают 0: их вклад уже учтён лучом от внутреннего слоя, и otherwise
+     * каждый слой посчитался бы дважды. Для пустой коллизии (открытые двери,
+     * решётки) — 0.
      */
     public static double faceConductance(Level level, BlockPos pos, Direction direction) {
         BlockState state = level.getBlockState(pos);
@@ -63,17 +73,11 @@ public final class ThermalProperties {
         List<AABB> boxes = shape.toAabbs();
         if (boxes.isEmpty()) return 0.0;
 
+        // Сэндвич считаем один раз — от внутреннего слоя.
+        BlockPos roomSide = pos.relative(direction.getOpposite());
+        if (!level.getBlockState(roomSide).getCollisionShape(level, roomSide).isEmpty()) return 0.0;
+
         Direction.Axis axis = direction.getAxis();
-        double thickness = 0.0;
-        for (AABB box : boxes) {
-            double extent = switch (axis) {
-                case X -> box.maxX - box.minX;
-                case Y -> box.maxY - box.minY;
-                default -> box.maxZ - box.minZ;
-            };
-            thickness = Math.max(thickness, extent);
-        }
-        if (thickness <= 0.001) return 0.0;
 
         double area = 0.0;
         for (AABB box : boxes) {
@@ -82,8 +86,29 @@ public final class ThermalProperties {
             area += w * h;
         }
         area = Math.max(0.0, Math.min(1.0, area));
+        if (area <= 0.0) return 0.0;
 
-        return area * conductivity(state) / thickness;
+        double resistance = 0.0;
+        BlockPos cursor = pos;
+        for (int layer = 0; layer < MAX_SANDWICH_DEPTH; layer++) {
+            BlockState layerState = layer == 0 ? state : level.getBlockState(cursor);
+            VoxelShape layerShape = layerState.getCollisionShape(level, cursor);
+            if (layerShape.isEmpty()) break; // вышли наружу — за воздушной прослойкой луч не идёт
+            double thickness = 0.0;
+            for (AABB box : layerShape.toAabbs()) {
+                double extent = switch (axis) {
+                    case X -> box.maxX - box.minX;
+                    case Y -> box.maxY - box.minY;
+                    default -> box.maxZ - box.minZ;
+                };
+                thickness = Math.max(thickness, extent);
+            }
+            if (thickness <= 0.001) break;
+            resistance += thickness / conductivity(layerState);
+            cursor = cursor.relative(direction);
+        }
+        if (resistance <= 0.0) return 0.0;
+        return area / resistance;
     }
 
     /** Эвристики по тегам и ID блока: типовые λ стройматериалов. */

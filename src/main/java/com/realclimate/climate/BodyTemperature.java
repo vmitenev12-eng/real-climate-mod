@@ -1,6 +1,8 @@
 package com.realclimate.climate;
 
 import com.realclimate.RealClimate;
+import com.realclimate.network.ModMessages;
+import com.realclimate.network.PacketClimateState;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
@@ -32,6 +34,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * Замерзание зависит от одежды и сырости: мокрая одежда почти не греет и на
  * морозе дополнительно вытягивает тепло. В жару наоборот — перегрев от слишком
  * тёплой одежды, чем теплее одет и чем выше температура, тем сильнее.
+ *
+ * Клиенту каждые 40 тиков уходят готовые значения (тело, воздух, утепление),
+ * чтобы HUD не пересчитывал климат сам и не расходился с сервером.
  */
 @Mod.EventBusSubscriber(modid = RealClimate.MODID)
 public final class BodyTemperature {
@@ -39,6 +44,12 @@ public final class BodyTemperature {
     private static final String KEY = "realclimate_body";
     private static final int PERIOD = 40;
     private static final Map<UUID, AmbientCache> AMBIENT_CACHE = new ConcurrentHashMap<>();
+
+    // Клиентская копия серверных значений (заполняется только из пакета).
+    private static volatile double syncedBody = Double.NaN;
+    private static volatile double syncedAmbient = Double.NaN;
+    private static volatile double syncedInsulation = Double.NaN;
+    private static volatile long syncedAtMs = Long.MIN_VALUE;
 
     private BodyTemperature() {}
 
@@ -49,6 +60,34 @@ public final class BodyTemperature {
 
     private static void set(Player p, double v) {
         p.getPersistentData().putDouble(KEY, v);
+    }
+
+    /** Приём пакета на клиенте: сервер прислал свежие значения для HUD. */
+    public static void applyClientSync(double body, double ambient, double insulation) {
+        syncedBody = body;
+        syncedAmbient = ambient;
+        syncedInsulation = insulation;
+        syncedAtMs = System.currentTimeMillis();
+    }
+
+    /** Синхронизация ещё живая? (пакет каждые 2 с, запас — 10 с) */
+    private static boolean syncFresh() {
+        return !Double.isNaN(syncedBody) && System.currentTimeMillis() - syncedAtMs < 10_000;
+    }
+
+    /** Температура тела для отображения: серверная, если синхронизация жива. */
+    public static double bodyDisplay(Player p) {
+        return syncFresh() ? syncedBody : get(p);
+    }
+
+    /** Воздух для отображения: серверный (с инерцией помещения), иначе локальный расчёт. */
+    public static double ambientDisplay(Player p) {
+        return syncFresh() ? syncedAmbient : effectiveAmbient(p);
+    }
+
+    /** Утепление одежды для отображения. */
+    public static double insulationDisplay(Player p) {
+        return syncFresh() ? syncedInsulation : insulation(p);
     }
 
     /** Температура воздуха в точке игрока с учётом погоды, укрытия и тепла рядом. */
@@ -199,7 +238,12 @@ public final class BodyTemperature {
     public static void onPlayerTick(TickEvent.PlayerTickEvent e) {
         if (e.phase != TickEvent.Phase.END || !(e.player instanceof ServerPlayer p)) return;
         if (p.tickCount % PERIOD != 0) return;
-        if (p.isCreative() || p.isSpectator()) { set(p, NORMAL); return; }
+        if (p.isCreative() || p.isSpectator()) {
+            set(p, NORMAL);
+            // В креативе тело не замерзает, но HUD должен показывать честный климат.
+            ModMessages.sendToPlayer(p, new PacketClimateState(NORMAL, effectiveAmbient(p), insulation(p)));
+            return;
+        }
 
         IndoorClimate.updatePlayer(p);
 
@@ -225,6 +269,8 @@ public final class BodyTemperature {
         cur += (target - cur) * 0.05;
         set(p, cur);
         applyEffects(p, cur);
+        // HUD показывает ровно эти значения — с инерцией помещения и мокрой одеждой.
+        ModMessages.sendToPlayer(p, new PacketClimateState(cur, amb, ins));
     }
 
     private static void applyEffects(ServerPlayer p, double t) {

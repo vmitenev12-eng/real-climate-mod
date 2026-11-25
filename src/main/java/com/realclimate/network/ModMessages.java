@@ -2,8 +2,10 @@ package com.realclimate.network;
 
 import com.realclimate.RealClimate;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.network.NetworkRegistry;
 import net.minecraftforge.network.NetworkDirection;
+import net.minecraftforge.network.PacketDistributor;
 import net.minecraftforge.network.simple.SimpleChannel;
 
 public final class ModMessages {
@@ -26,11 +28,20 @@ public final class ModMessages {
                 .decoder(PacketClimateSettings::decode)
                 .consumerMainThread(PacketClimateSettings::handle)
                 .add();
+        INSTANCE.messageBuilder(PacketClimateState.class, id++, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(PacketClimateState::encode)
+                .decoder(PacketClimateState::decode)
+                .consumerMainThread(PacketClimateState::handle)
+                .add();
     }
 
     public static SimpleChannel get() { return INSTANCE; }
 
     public static <MSG> void sendToServer(MSG msg) {
         if (INSTANCE != null) INSTANCE.sendToServer(msg);
+    }
+
+    public static <MSG> void sendToPlayer(ServerPlayer player, MSG msg) {
+        if (INSTANCE != null) INSTANCE.send(PacketDistributor.PLAYER.with(() -> player), msg);
     }
 }

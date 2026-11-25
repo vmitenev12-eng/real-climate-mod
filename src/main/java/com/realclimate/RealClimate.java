@@ -12,6 +12,7 @@ import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.config.ModConfig;
+import org.spongepowered.asm.launch.Mixins;
 
 @Mod(RealClimate.MODID)
 public class RealClimate {
@@ -29,6 +30,9 @@ public class RealClimate {
         ModMessages.register();
 
         ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, ClimateConfig.SPEC);
+
+        // Миксины: тип осадков решает климат мода, а не шаблон биома.
+        Mixins.addConfiguration("real_climate.mixins.json");
 
         // Клиентские события регистрируются через @Mod.EventBusSubscriber аннотации
         // KeyOverlayRenderer, BodyTemperature, ClimateEvents, ClimateService — самoregistrating

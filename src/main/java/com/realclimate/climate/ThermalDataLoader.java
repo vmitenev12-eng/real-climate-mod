@@ -12,7 +12,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Загружает переопределения теплопроводности из data/*/real_climate/thermal/*.json.
+  * Загружает переопределения теплопроводности из data/<namespace>/real_climate/thermal/*.json.
  * Формат файла: {"modid:block_path": 0.77, ...} — полные ID блоков любых модов
  * (vanilla, hospitals, ptm2, LittleTiles...). Файлы из всех модов и датапаков
  * объединяются, климатический мод остаётся без жёстких зависимостей.

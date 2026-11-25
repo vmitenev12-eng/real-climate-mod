@@ -5,7 +5,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.LightType;
+import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.ArrayDeque;
@@ -32,7 +32,7 @@ public final class IndoorClimate {
     /** 0 — на открытом воздухе, 1 — полностью внутри помещения. */
     public static double shelter(Level level, BlockPos pos) {
         if (level.canSeeSky(pos)) return 0.0;
-        int sky = level.getBrightness(LightType.SKY, pos);
+        int sky = level.getBrightness(LightLayer.SKY, pos);
         double s = (15 - sky) / 15.0;
         return Math.max(0.0, Math.min(1.0, (s - 0.25) / 0.5));
     }

@@ -23,6 +23,7 @@ import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
+import net.minecraft.world.level.block.state.BlockBehaviour;
 
 public class ControlPanelBlock extends Block implements EntityBlock {
     public static final IntegerProperty FACING = IntegerProperty.create("facing", 0, 3);

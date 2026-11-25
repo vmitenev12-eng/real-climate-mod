@@ -66,7 +66,23 @@ public final class BodyTemperature {
             // глубокие пещеры стабилизируются около +10 °C
             t = t * 0.4 + 6.0;
         }
-        double result = t + heatNearby(lv, pos) + VentilationService.temperatureOffset(lv, pos, t);
+        double heat = heatNearby(lv, pos);
+        double vent = VentilationService.temperatureOffset(lv, pos, t);
+        double instant = t + heat + vent;
+
+        double result = instant;
+        double shelter = IndoorClimate.shelter(lv, pos);
+        if (shelter > 0.01) {
+            // В помещении температура — это инерционная воздушная масса (IndoorClimate),
+            // плюс локальные градиенты у самих источников.
+            double air = IndoorClimate.getAir(p);
+            if (Double.isNaN(air)) air = t;
+            double indoor = air + heat * 0.35 + vent * 0.5;
+            double mixed = instant * (1.0 - shelter * 0.9) + indoor * (shelter * 0.9);
+            // Сквозняк у открытых дверей и щелей продувает: подмешиваем уличный воздух.
+            double draft = IndoorClimate.draftFactor(lv, pos);
+            result = mixed + (instant - mixed) * Math.min(1.0, draft * 0.6);
+        }
         AMBIENT_CACHE.put(p.getUUID(), new AmbientCache(lv.dimension(), pos.immutable(), gameTime, result));
         return result;
     }
@@ -75,7 +91,7 @@ public final class BodyTemperature {
                                 long gameTime, double temperature) {}
 
     /** Heat and cold travel only through connected air cells, not through solid walls. */
-    private static double heatNearby(Level lv, BlockPos c) {
+    public static double heatNearby(Level lv, BlockPos c) {
         double heat = 0;
         java.util.ArrayDeque<BlockPos> queue = new java.util.ArrayDeque<>();
         java.util.Map<BlockPos, Integer> distances = new java.util.HashMap<>();
@@ -105,7 +121,7 @@ public final class BodyTemperature {
         return Math.max(-100.0, Math.min(100.0, heat));
     }
 
-    private static double sourceStrength(Level level, BlockPos pos, BlockState state) {
+    public static double sourceStrength(Level level, BlockPos pos, BlockState state) {
         boolean enclosed = !level.canSeeSky(pos);
         if (state.is(Blocks.LAVA)) return enclosed ? 8.0 : 4.0;
         if (state.is(BlockTags.FIRE)) return enclosed ? 6.0 : 3.0;
@@ -164,6 +180,8 @@ public final class BodyTemperature {
         if (e.phase != TickEvent.Phase.END || !(e.player instanceof ServerPlayer p)) return;
         if (p.tickCount % PERIOD != 0) return;
         if (p.isCreative() || p.isSpectator()) { set(p, NORMAL); return; }
+
+        IndoorClimate.updatePlayer(p);
 
         double amb = effectiveAmbient(p);
         double ins = insulation(p);

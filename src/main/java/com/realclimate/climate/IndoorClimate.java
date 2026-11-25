@@ -22,6 +22,11 @@ import java.util.Set;
  * через открытые двери, окна и щели из миниблоков. Поэтому переходы через
  * двери плавные: воздух «сохраняется» и постепенно смешивается с уличным,
  * а у открытой двери возникает сквозняк.
+ *
+ * Ограждающие конструкции учитываются по-настоящему: каждая граница комнаты
+ * вносит теплопроводность area·λ/толщина (ThermalProperties), поэтому
+ * деревянная бытовка держит тепло, каменный дом — плохо, тонкая стенка
+ * из миниблоков — хуже всего.
  */
 public final class IndoorClimate {
     private static final String AIR_KEY = "realclimate_air";
@@ -66,8 +71,10 @@ public final class IndoorClimate {
 
     /**
      * Равновесная температура воздуха в помещении вокруг точки. Учитывает
-     * источники тепла, подключённые вентиляционные решётки и утечки наружу.
-     * Если объём не замкнут — равновесие стремится к уличной температуре.
+     * источники тепла, подключённые вентиляционные решётки, утечки наружу и
+     * теплопроводность ограждающих конструкций (стены, окна, тонкие стенки
+     * из миниблоков). Если объём не замкнут — равновесие стремится к уличной
+     * температуре.
      */
     public static double roomEquilibrium(Level level, BlockPos origin, double rawAmbient) {
         RoomScan scan = scanRoom(level, origin, rawAmbient);
@@ -79,7 +86,10 @@ public final class IndoorClimate {
         // Несколько решёток в одной системе не складывают температуру.
         double grilleSaturation = scan.grilleCount <= 1 ? 0.6 : Math.min(1.0, 0.6 + 0.2 * (scan.grilleCount - 1));
         double grilleTerm = scan.grilleTempSum * grilleSaturation;
-        return rawAmbient + (scan.heat / spread + grilleTerm) * (1.0 - leak);
+        // Ограждающие конструкции: envelope = Σ (площадь × λ / толщина).
+        // Большой envelope — тонкие/металлические/стеклянные стены, тепло уходит.
+        double envelopeDamping = 1.0 / (1.0 + scan.envelope * 0.12);
+        return rawAmbient + (scan.heat / spread + grilleTerm) * (1.0 - leak) * envelopeDamping;
     }
 
     /** Текущая температура воздуха вокруг игрока (с инерцией помещения). */
@@ -115,6 +125,7 @@ public final class IndoorClimate {
         Set<Long> boundary = new HashSet<>();
         double openings = 0.0;
         double heat = 0.0;
+        double envelope = 0.0;
         int grilleCount = 0;
         double grilleTempSum = 0.0;
         boolean overflow = false;
@@ -149,6 +160,9 @@ public final class IndoorClimate {
                     openings += MiniBlockIntegration.openGapRatio(level, neighbor, direction);
                 }
                 heat += BodyTemperature.sourceStrength(level, neighbor, state);
+                // Теплопроводность ограждения: тонкая стенка из миниблоков
+                // пропускает тепло пропорционально своей толщине.
+                envelope += ThermalProperties.faceConductance(level, neighbor, direction);
                 if (state.getBlock() instanceof com.realclimate.block.GrilleBlock
                         && level.getBlockEntity(neighbor) instanceof com.realclimate.tileentity.GrilleBlockEntity grille
                         && grille.isOpen() && VentilationService.hasActiveAirflow(level, neighbor)) {
@@ -159,9 +173,9 @@ public final class IndoorClimate {
                 }
             }
         }
-        return new RoomScan(room.size(), openings, heat, grilleCount, grilleTempSum, overflow);
+        return new RoomScan(room.size(), openings, heat, envelope, grilleCount, grilleTempSum, overflow);
     }
 
-    private record RoomScan(int volume, double openings, double heat,
+    private record RoomScan(int volume, double openings, double heat, double envelope,
                             int grilleCount, double grilleTempSum, boolean overflow) {}
 }

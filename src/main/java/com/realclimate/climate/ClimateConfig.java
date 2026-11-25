@@ -9,6 +9,9 @@ public final class ClimateConfig {
     public static final ForgeConfigSpec.BooleanValue ENABLE_CLIMATE;
     public static final ForgeConfigSpec.DoubleValue BASE_TEMP;
     public static final ForgeConfigSpec.DoubleValue BASE_HUMIDITY;
+    public static final ForgeConfigSpec.BooleanValue REAL_TIME;
+    public static final ForgeConfigSpec.ConfigValue<String> TIME_ANCHOR;
+    public static final ForgeConfigSpec.BooleanValue SNOW_MELT;
 
     static {
         ForgeConfigSpec.Builder builder = new ForgeConfigSpec.Builder();
@@ -16,6 +19,14 @@ public final class ClimateConfig {
         ENABLE_CLIMATE = builder.comment("Включить климатическую систему").define("enabled", true);
         BASE_TEMP = builder.comment("Базовая температура (°C)").defineInRange("base_temp", 20.0, -50.0, 60.0);
         BASE_HUMIDITY = builder.comment("Базовая влажность (%)").defineInRange("base_humidity", 50.0, 0.0, 100.0);
+        builder.pop();
+        builder.push("time");
+        REAL_TIME = builder.comment("Синхронизировать время суток с реальным временем по долготе (15° = 1 час)").define("real_time", true);
+        TIME_ANCHOR = builder.comment("Чья долгота задаёт мировое время: 'spawn' — долгота точки спавна, или число (долгота -180..180)")
+                .define("time_anchor", "spawn");
+        builder.pop();
+        builder.push("precipitation");
+        SNOW_MELT = builder.comment("Снег и лёд тают по температуре, скорость зависит от тепла").define("snow_melt", true);
         builder.pop();
         SPEC = builder.build();
         // Регистрация выполняется в RealClimate, чтобы избежать двойной регистрации

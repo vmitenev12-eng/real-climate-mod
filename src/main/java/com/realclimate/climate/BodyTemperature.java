@@ -28,6 +28,10 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * Температура тела игрока. Считается на сервере раз в 40 тиков (2 с), без постоянной нагрузки.
  * Состояние хранится в persistentData игрока, поэтому переживает перезаход.
+ *
+ * Замерзание зависит от одежды и сырости: мокрая одежда почти не греет и на
+ * морозе дополнительно вытягивает тепло. В жару наоборот — перегрев от слишком
+ * тёплой одежды, чем теплее одет и чем выше температура, тем сильнее.
  */
 @Mod.EventBusSubscriber(modid = RealClimate.MODID)
 public final class BodyTemperature {
@@ -176,7 +180,7 @@ public final class BodyTemperature {
         return false;
     }
 
-    /** Теплоизоляция брони: 0..1. */
+    /** Теплоизоляция сухой одежды: 0..1. */
     public static double insulation(Player p) {
         double sum = 0;
         for (EquipmentSlot slot : new EquipmentSlot[]{EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET}) {
@@ -201,9 +205,20 @@ public final class BodyTemperature {
 
         double amb = effectiveAmbient(p);
         double ins = insulation(p);
+        // Мокрая одежда почти не держит тепло.
+        boolean wet = p.isInWaterRainOrBubble();
+        if (wet) ins *= 0.35;
         double delta = amb - 20.0;
         if (delta < 0) delta *= (1.0 - 0.8 * ins);   // броня защищает от холода
         else delta *= (1.0 + 0.3 * ins);              // и немного греет в жару
+        // Перегрев от слишком тёплой одежды: чем жарче и теплее одет, тем хуже.
+        if (amb > 26.0 && ins > 0.5) {
+            delta += (ins - 0.5) * (amb - 26.0) * 0.4;
+        }
+        // Мокрые вещи на холоде дополнительно вытягивают тепло.
+        if (wet && amb < 15.0) {
+            delta -= (15.0 - amb) * 0.25;
+        }
         double target = NORMAL + Math.max(-9.0, Math.min(6.0, delta * 0.12));
 
         double cur = get(p);

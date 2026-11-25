@@ -7,6 +7,7 @@ import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.phys.Vec3;
+import net.minecraftforge.event.AddReloadListenerEvent;
 import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.event.server.ServerStartingEvent;
 import net.minecraftforge.event.server.ServerStoppedEvent;
@@ -22,19 +23,38 @@ public final class ClimateEvents {
     @SubscribeEvent
     public static void onStarting(ServerStartingEvent e) {
         ClimateService.start(e.getServer().overworld().getSeed());
+        RealTimeService.init(e.getServer());
     }
 
     @SubscribeEvent
     public static void onStopped(ServerStoppedEvent e) {
         ClimateService.stop();
         VentilationService.clear();
+        RealTimeService.clear();
+    }
+
+    @SubscribeEvent
+    public static void onReloadListeners(AddReloadListenerEvent e) {
+        e.addListener(new ThermalDataLoader());
     }
 
     @SubscribeEvent
     public static void onCommands(RegisterCommandsEvent e) {
         e.getDispatcher().register(Commands.literal("climate")
                 .executes(ClimateEvents::info)
-                .then(Commands.literal("body").executes(ClimateEvents::body)));
+                .then(Commands.literal("body").executes(ClimateEvents::body))
+                .then(Commands.literal("time").executes(ClimateEvents::time)));
+    }
+
+    private static int time(CommandContext<CommandSourceStack> ctx) {
+        CommandSourceStack src = ctx.getSource();
+        Vec3 p = src.getPosition();
+        double hours = RealTimeService.localHours(p.x);
+        double lon = Geo.longitude(p.x, ClimateConfig.scale());
+        String text = String.format("Локальное время: %02d:%02d (долгота %.1f°, UTC%+d)",
+                (int) hours, (int) ((hours % 1.0) * 60.0), lon, Math.round(lon / 15.0));
+        src.sendSuccess(() -> Component.literal(text), false);
+        return 1;
     }
 
     private static int body(CommandContext<CommandSourceStack> ctx) {

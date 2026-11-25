@@ -55,6 +55,32 @@ public final class VentilationService {
         return sources == 0 ? fallback : total / sources;
     }
 
+    /**
+     * Сколько решёток обслуживается теми же вентиляционными магистралями, что и
+     * решётка в точке pos. Мощность системы делится между ними поровну: несколько
+     * решёток в одной системе не должны складывать температуру друг с другом.
+     */
+    public static synchronized int grilleSystemSize(Level level, BlockPos pos) {
+        Map<Long, Map<Long, AirFlow>> dimensionFlows = SOURCES.get(worldKey(level));
+        if (dimensionFlows == null) return 1;
+        long packedPos = pos.asLong();
+        int count = 0;
+        for (Map<Long, AirFlow> route : dimensionFlows.values()) {
+            if (!route.containsKey(packedPos)) continue;
+            for (long cell : route.keySet()) {
+                BlockPos cellPos = BlockPos.of(cell);
+                if (!level.isLoaded(cellPos)) continue;
+                net.minecraft.resources.ResourceLocation id =
+                        net.minecraftforge.registries.ForgeRegistries.BLOCKS.getKey(level.getBlockState(cellPos).getBlock());
+                if (id != null && id.getNamespace().equals("real_climate")
+                        && (id.getPath().equals("grille_block") || id.getPath().equals("vent_ceiling_grille"))) {
+                    count++;
+                }
+            }
+        }
+        return Math.max(1, count);
+    }
+
     public static synchronized double temperatureOffset(Level level, BlockPos pos, double ambient) {
         Map<Long, Map<Long, AirFlow>> dimensionFlows = SOURCES.get(worldKey(level));
         if (dimensionFlows == null) return 0.0;

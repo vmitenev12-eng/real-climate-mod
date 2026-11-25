@@ -72,16 +72,22 @@ public final class BodyTemperature {
 
         double result = instant;
         double shelter = IndoorClimate.shelter(lv, pos);
+        double draft = IndoorClimate.draftFactor(lv, pos);
+        double air = IndoorClimate.getAir(p);
+        if (Double.isNaN(air)) air = t;
         if (shelter > 0.01) {
             // В помещении температура — это инерционная воздушная масса (IndoorClimate),
             // плюс локальные градиенты у самих источников.
-            double air = IndoorClimate.getAir(p);
-            if (Double.isNaN(air)) air = t;
             double indoor = air + heat * 0.35 + vent * 0.5;
             double mixed = instant * (1.0 - shelter * 0.9) + indoor * (shelter * 0.9);
-            // Сквозняк у открытых дверей и щелей продувает: подмешиваем уличный воздух.
-            double draft = IndoorClimate.draftFactor(lv, pos);
+            // Сквозняк у открытых дверей и щелей продувает в обе стороны:
+            // уличный воздух мягко заходит в помещение — резких перепадов у проёма нет.
             result = mixed + (instant - mixed) * Math.min(1.0, draft * 0.6);
+        } else if (draft > 0.0) {
+            // Снаружи у открытой двери/окна комнатный воздух выходит наружу:
+            // в проёме на улице заметно теплее (или прохладнее от кондиционера),
+            // и обе стороны смешиваются мягко, без скачка.
+            result = instant + (air - instant) * Math.min(1.0, draft * 0.6);
         }
         AMBIENT_CACHE.put(p.getUUID(), new AmbientCache(lv.dimension(), pos.immutable(), gameTime, result));
         return result;
@@ -140,13 +146,23 @@ public final class BodyTemperature {
                 && state.getValue(com.realclimate.block.ACIndoorBlock.ACTIVE)
                 && level.getBlockEntity(pos) instanceof com.realclimate.tileentity.ACIndoorBlockEntity indoor
                 && indoor.isEnabled()) {
-            return indoor.getTargetTemp() - ClimateService.getTemperature(level, pos);
+            // Один наружный блок = одна система: мощность делится поровну между
+            // всеми подключёнными внутренними блоками, уставка не суммируется.
+            int units = 1;
+            if (indoor.getLinkedOutdoor() != null
+                    && level.getBlockEntity(indoor.getLinkedOutdoor()) instanceof com.realclimate.tileentity.ACOutdoorBlockEntity outdoor) {
+                units = Math.max(1, outdoor.getLinkedIndoors().size());
+            }
+            return (indoor.getTargetTemp() - ClimateService.getTemperature(level, pos)) / units;
         }
         if (state.getBlock() instanceof com.realclimate.block.GrilleBlock
                 && level.getBlockEntity(pos) instanceof com.realclimate.tileentity.GrilleBlockEntity grille
                 && grille.isOpen() && VentilationService.hasActiveAirflow(level, pos)) {
             double airflowTemp = VentilationService.airflowTemperature(level, pos, grille.getTargetTemp());
-            return airflowTemp - ClimateService.getTemperature(level, pos);
+            // Мощность вентсистемы делится между всеми её решётками: N решёток в
+            // одной системе дают в сумме эффект одной, а не N-кратный перегруз.
+            double share = 1.0 / VentilationService.grilleSystemSize(level, pos);
+            return (airflowTemp - ClimateService.getTemperature(level, pos)) * share;
         }
         return 0.0;
     }

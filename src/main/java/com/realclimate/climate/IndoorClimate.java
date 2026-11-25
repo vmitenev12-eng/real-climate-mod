@@ -70,15 +70,15 @@ public final class IndoorClimate {
      * Если объём не замкнут — равновесие стремится к уличной температуре.
      */
     public static double roomEquilibrium(Level level, BlockPos origin, double rawAmbient) {
-        RoomScan scan = scanRoom(level, origin);
+        RoomScan scan = scanRoom(level, origin, rawAmbient);
         if (scan == null) return rawAmbient;
         double spread = 1.0 + Math.sqrt(scan.volume) / 8.0;
         double leak = Math.min(1.0, scan.openings * 0.25 + (scan.overflow ? 0.5 : 0.0));
-        double grilleTerm = 0.0;
-        if (scan.grilleCount > 0) {
-            double flow = scan.grilleTemp / scan.grilleCount;
-            grilleTerm = (flow - rawAmbient) * Math.min(1.0, scan.grilleCount * 0.6);
-        }
+        // Каждая решётка тянет воздух к температуре своей системы, но мощность
+        // системы делится между всеми её решётками: (flow - raw) / systemSize.
+        // Несколько решёток в одной системе не складывают температуру.
+        double grilleSaturation = scan.grilleCount <= 1 ? 0.6 : Math.min(1.0, 0.6 + 0.2 * (scan.grilleCount - 1));
+        double grilleTerm = scan.grilleTempSum * grilleSaturation;
         return rawAmbient + (scan.heat / spread + grilleTerm) * (1.0 - leak);
     }
 
@@ -102,18 +102,21 @@ public final class IndoorClimate {
         double shelter = shelter(level, pos);
         double equilibrium = roomEquilibrium(level, pos, raw);
         // На улице воздух меняется быстро, в помещении — инерционно.
+        // У открытой двери сквозняк ускоряет обмен в обе стороны.
+        double draft = draftFactor(level, pos);
         double rate = 0.30 * (1.0 - shelter) + 0.04 * shelter;
+        rate = Math.min(1.0, rate + draft * 0.15);
         current += (equilibrium - current) * rate;
         player.getPersistentData().putDouble(AIR_KEY, current);
     }
 
-    private static RoomScan scanRoom(Level level, BlockPos origin) {
+    private static RoomScan scanRoom(Level level, BlockPos origin, double rawAmbient) {
         Set<Long> room = new HashSet<>();
         Set<Long> boundary = new HashSet<>();
         double openings = 0.0;
         double heat = 0.0;
         int grilleCount = 0;
-        double grilleTemp = 0.0;
+        double grilleTempSum = 0.0;
         boolean overflow = false;
 
         ArrayDeque<BlockPos> queue = new ArrayDeque<>();
@@ -150,13 +153,15 @@ public final class IndoorClimate {
                         && level.getBlockEntity(neighbor) instanceof com.realclimate.tileentity.GrilleBlockEntity grille
                         && grille.isOpen() && VentilationService.hasActiveAirflow(level, neighbor)) {
                     grilleCount++;
-                    grilleTemp += VentilationService.airflowTemperature(level, neighbor, grille.getTargetTemp());
+                    double flow = VentilationService.airflowTemperature(level, neighbor, grille.getTargetTemp());
+                    int systemSize = VentilationService.grilleSystemSize(level, neighbor);
+                    grilleTempSum += (flow - rawAmbient) / systemSize;
                 }
             }
         }
-        return new RoomScan(room.size(), openings, heat, grilleCount, grilleTemp, overflow);
+        return new RoomScan(room.size(), openings, heat, grilleCount, grilleTempSum, overflow);
     }
 
     private record RoomScan(int volume, double openings, double heat,
-                            int grilleCount, double grilleTemp, boolean overflow) {}
+                            int grilleCount, double grilleTempSum, boolean overflow) {}
 }

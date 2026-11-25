@@ -14,22 +14,34 @@ import java.util.HashSet;
 import java.util.Set;
 
 public class ControlPanelBlockEntity extends BlockEntity {
+    private static final String MEASURED_KEY = "LastMeasured";
     private final Set<BlockPos> linkedOutdoors = new HashSet<>();
     private final Set<BlockPos> linkedThermometers = new HashSet<>();
     private boolean enabled = true;
     private double targetTemp = 22.0;
     private double integral = 0.0;
-    /** Последнее усреднённое показание привязанных термодатчиков (для отладки/GUI). */
+    /** Последнее усреднённое показание привязанных термодатчиков (для экрана пульта). */
     private double lastMeasured = Double.NaN;
 
     public ControlPanelBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntities.CONTROL_PANEL.get(), pos, state);
     }
 
+    /** Сохранить и отправить обновление клиенту — без этого экран пульта не меняется. */
+    private void sync() {
+        setChanged();
+        if (level != null && !level.isClientSide) {
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+        }
+    }
+
     public boolean isEnabled() { return enabled; }
-    public void setEnabled(boolean enabled) { this.enabled = enabled; setChanged(); }
+    public void setEnabled(boolean enabled) { if (this.enabled != enabled) { this.enabled = enabled; sync(); } }
     public double getTargetTemp() { return targetTemp; }
-    public void setTargetTemp(double targetTemp) { this.targetTemp = Math.max(-20.0, Math.min(95.0, targetTemp)); setChanged(); }
+    public void setTargetTemp(double targetTemp) {
+        double clamped = Math.max(-20.0, Math.min(95.0, targetTemp));
+        if (this.targetTemp != clamped) { this.targetTemp = clamped; sync(); }
+    }
     public Set<BlockPos> getLinkedOutdoors() { return linkedOutdoors; }
     public Set<BlockPos> getLinkedThermometers() { return linkedThermometers; }
     public double getLastMeasured() { return lastMeasured; }
@@ -39,12 +51,12 @@ public class ControlPanelBlockEntity extends BlockEntity {
 
     public boolean linkOutdoor(BlockPos pos) {
         boolean changed = linkedOutdoors.add(pos);
-        if (changed) setChanged();
+        if (changed) sync();
         return changed;
     }
 
     public void unlinkOutdoor(BlockPos pos) {
-        if (linkedOutdoors.remove(pos)) setChanged();
+        if (linkedOutdoors.remove(pos)) sync();
     }
 
     public void unlinkAll() {
@@ -52,18 +64,18 @@ public class ControlPanelBlockEntity extends BlockEntity {
             linkedOutdoors.clear();
             linkedThermometers.clear();
             integral = 0.0;
-            setChanged();
+            sync();
         }
     }
 
     public boolean linkThermometer(BlockPos pos) {
         boolean changed = linkedThermometers.add(pos);
-        if (changed) { integral = 0.0; setChanged(); }
+        if (changed) { integral = 0.0; sync(); }
         return changed;
     }
 
     public void unlinkThermometer(BlockPos pos) {
-        if (linkedThermometers.remove(pos)) { integral = 0.0; setChanged(); }
+        if (linkedThermometers.remove(pos)) { integral = 0.0; sync(); }
     }
 
     public static void serverTick(Level level, BlockPos pos, BlockState state, ControlPanelBlockEntity be) {
@@ -82,7 +94,10 @@ public class ControlPanelBlockEntity extends BlockEntity {
         }
         if (count == 0) return;
         double measured = sum / count;
-        be.lastMeasured = measured;
+        if (Double.isNaN(be.lastMeasured) || Math.abs(be.lastMeasured - measured) > 0.05) {
+            be.lastMeasured = measured;
+            be.sync();
+        }
 
         // ПИ-регулятор: error > 0 — в помещении холоднее уставки, греем сильнее.
         double error = be.targetTemp - measured;
@@ -103,6 +118,7 @@ public class ControlPanelBlockEntity extends BlockEntity {
         tag.putBoolean("Enabled", enabled);
         tag.putDouble("TargetTemp", targetTemp);
         tag.putDouble("Integral", integral);
+        if (!Double.isNaN(lastMeasured)) tag.putDouble(MEASURED_KEY, lastMeasured);
         CompoundTag linked = new CompoundTag();
         int index = 0;
         for (BlockPos pos : linkedOutdoors) {
@@ -135,6 +151,7 @@ public class ControlPanelBlockEntity extends BlockEntity {
         enabled = tag.getBoolean("Enabled");
         targetTemp = Math.max(-20.0, Math.min(95.0, tag.getDouble("TargetTemp")));
         integral = tag.getDouble("Integral");
+        lastMeasured = tag.contains(MEASURED_KEY) ? tag.getDouble(MEASURED_KEY) : Double.NaN;
         linkedOutdoors.clear();
         CompoundTag linked = tag.getCompound("Linked");
         for (String key : linked.getAllKeys()) {

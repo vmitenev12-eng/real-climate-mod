@@ -14,5 +14,6 @@ public final class ClimateClientSetup {
     @SubscribeEvent
     public static void registerRenderers(EntityRenderersEvent.RegisterRenderers event) {
         event.registerBlockEntityRenderer(ModBlockEntities.CONTROL_PANEL.get(), ControlPanelRenderer::new);
+        event.registerBlockEntityRenderer(ModBlockEntities.THERMOMETER.get(), ThermometerRenderer::new);
     }
 }

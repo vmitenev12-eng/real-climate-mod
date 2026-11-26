@@ -181,7 +181,7 @@ public class ACOutdoorBlockEntity extends BlockEntity {
         propagateThroughVentilation(level, pos, be.getOperatingTargetTemp(level), false);
     }
 
-    private double getOperatingTargetTemp(Level level) {
+    public double getOperatingTargetTemp(Level level) {
         for (BlockPos panelPos : linkedPanels) {
             if (!level.isLoaded(panelPos)) continue;
             if (level.getBlockEntity(panelPos) instanceof ControlPanelBlockEntity panel

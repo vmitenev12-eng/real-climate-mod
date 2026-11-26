@@ -284,23 +284,22 @@ public final class BodyTemperature {
                 && state.getValue(com.realclimate.block.ACIndoorBlock.ACTIVE)
                 && level.getBlockEntity(pos) instanceof com.realclimate.tileentity.ACIndoorBlockEntity indoor
                 && indoor.isEnabled()) {
-            // Один наружный блок = одна система: мощность делится поровну между
-            // всеми подключёнными внутренними блоками, уставка не суммируется.
-            int units = 1;
-            if (indoor.getLinkedOutdoor() != null
-                    && level.getBlockEntity(indoor.getLinkedOutdoor()) instanceof com.realclimate.tileentity.ACOutdoorBlockEntity outdoor) {
-                units = Math.max(1, outdoor.getLinkedIndoors().size());
-            }
-            return (indoor.getTargetTemp() - ClimateService.getTemperature(level, pos)) / units;
+            // Локальная струя рядом с блоком — ощущение «дует». Вклад в
+            // температуру комнаты IndoorClimate считает отдельным термом,
+            // поэтому здесь эффект небольшой и ограниченный, без дублирования.
+            double emission = indoor.getEmission();
+            if (Double.isNaN(emission)) emission = indoor.getTargetTemp();
+            double stream = (emission - ClimateService.getTemperature(level, pos)) * 0.12;
+            return Math.max(-6.0, Math.min(6.0, stream));
         }
         if (state.getBlock() instanceof com.realclimate.block.GrilleBlock
                 && level.getBlockEntity(pos) instanceof com.realclimate.tileentity.GrilleBlockEntity grille
                 && grille.isOpen() && VentilationService.hasActiveAirflow(level, pos)) {
-            double airflowTemp = VentilationService.airflowTemperature(level, pos, grille.getTargetTemp());
-            // Мощность вентсистемы делится между всеми её решётками: N решёток в
-            // одной системе дают в сумме эффект одной, а не N-кратный перегруз.
-            double share = 1.0 / VentilationService.grilleSystemSize(level, pos);
-            return (airflowTemp - ClimateService.getTemperature(level, pos)) * share;
+            // Локальный поток из решётки (комнатный вклад — в IndoorClimate).
+            double flow = grille.getEmission();
+            if (Double.isNaN(flow)) flow = VentilationService.airflowTemperature(level, pos, grille.getTargetTemp());
+            double stream = (flow - ClimateService.getTemperature(level, pos)) * 0.12;
+            return Math.max(-6.0, Math.min(6.0, stream));
         }
         return 0.0;
     }
@@ -353,7 +352,9 @@ public final class BodyTemperature {
         // Мокрая одежда почти не держит тепло — пропорционально влаге.
         if (wet > 0.01) ins *= (1.0 - 0.65 * wet);
         double delta = amb - 20.0;
-        if (delta < 0) delta *= (1.0 - 0.6 * ins);   // броня защищает от холода, но не абсолютно
+        // Холод гасится утеплением нелинейно: полный комплект (100%) срезает
+        // 85% мороза, половинка — только ~21%. Голый и мокрый мёрзнет как раньше.
+        if (delta < 0) delta *= (1.0 - 0.85 * ins * ins);
         else delta *= (1.0 + 0.3 * ins);              // и немного греет в жару
         // Перегрев от слишком тёплой одежды: чем жарче и теплее одет, тем хуже.
         if (amb > 26.0 && ins > 0.5) {

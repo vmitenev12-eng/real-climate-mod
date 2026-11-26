@@ -98,7 +98,7 @@ public final class ClimateEvents {
         String text = String.format(
                 "Тело: %.1f °C | воздух вокруг: %.1f °C | утепление: %.0f%%%n"
                         + "Комната: равновесие %.1f °C | масса воздуха %.1f °C | герметичность %.0f%%%n"
-                        + "Скан: %s",
+                        + "Скан: %s | сборка " + RealClimate.MOD_VERSION,
                 BodyTemperature.get(p), BodyTemperature.effectiveAmbient(p), BodyTemperature.insulation(p) * 100,
                 eq, Double.isNaN(air) ? raw : air, (Double.isNaN(enc) ? 0.0 : enc) * 100,
                 IndoorClimate.roomDebug(p.level(), p.blockPosition()));

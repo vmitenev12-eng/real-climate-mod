@@ -41,7 +41,8 @@ public class ThermometerBlockEntity extends BlockEntity {
             if (level == null) return 20.0;
             double raw = ClimateService.temperature(
                     worldPosition.getX(), worldPosition.getZ(), worldPosition.getY());
-            return IndoorClimate.roomEquilibrium(level, worldPosition, raw);
+            double eq = IndoorClimate.roomEquilibrium(level, worldPosition, raw);
+            return eq + IndoorClimate.localStream(level, worldPosition, eq);
         }
         return airTemp;
     }
@@ -53,6 +54,9 @@ public class ThermometerBlockEntity extends BlockEntity {
             raw = raw * 0.4 + 6.0;
         }
         double equilibrium = IndoorClimate.roomEquilibrium(level, pos, raw);
+        // Датчик меряет воздух в своей точке: рядом с дующим кондиционером
+        // или решёткой он честно покажет струю, а не среднее по комнате.
+        equilibrium += IndoorClimate.localStream(level, pos, equilibrium);
         boolean first = Double.isNaN(be.airTemp);
         if (first) be.airTemp = equilibrium;
         // Прибор откликается быстро и одинаково в любой точке комнаты:

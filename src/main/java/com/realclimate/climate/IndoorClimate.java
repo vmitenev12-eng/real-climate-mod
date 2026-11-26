@@ -45,6 +45,10 @@ import java.util.concurrent.ConcurrentHashMap;
  * стремительно принимает уличную температуру. Если дверь приоткрыли
  * и закрыли — прогретые стены быстро возвращают воздух почти к прежней
  * температуре, и проветривание почти незаметно.
+ *
+ * Переполнение скана (здание больше лимита обхода) — это НЕ улица:
+ * большой торговый центр или больница остаются помещением, поэтому
+ * штраф за переполнение минимальный, а герметичность не страдает вовсе.
  */
 public final class IndoorClimate {
     private static final String AIR_KEY = "realclimate_air";
@@ -139,10 +143,14 @@ public final class IndoorClimate {
     }
 
     /** Утечка нормируется на размер комнаты: открытая дверь в большом зале
-     * сквозит и тянет тепло, но не превращает весь объём в улицу. */
+     * сквозит и тянет тепло, но не превращает весь объём в улицу.
+     * Переполнение скана (огромное здание, длинные коридоры) — это НЕ улица,
+     * а лишь «объём не поместился в лимит обхода», поэтому штраф за него
+     * небольшой: чисто страховка от бесконечных пещер и края прогруженных
+     * чанков. */
     private static double leakOf(RoomScan scan) {
         double norm = Math.max(8.0, scan.volume * 0.04);
-        return Math.min(1.0, scan.openings / norm * 1.2 + (scan.overflow ? 0.5 : 0.0));
+        return Math.min(1.0, scan.openings / norm * 1.2 + (scan.overflow ? 0.2 : 0.0));
     }
 
     /**
@@ -154,7 +162,6 @@ public final class IndoorClimate {
     private static double equilibriumWithMass(Level level, BlockPos origin, RoomScan scan, double rawAmbient) {
         double eq = equilibrium(scan, rawAmbient);
         if (level.isClientSide) return eq;
-        if (scan.overflow && scan.volume >= MAX_ROOM_CELLS) return eq;
         double leak = leakOf(scan);
         double wallFactor = 1.0 / (1.0 + scan.envelope / Math.max(30.0, scan.volume) * 0.05);
         double coupling = 0.88 * wallFactor * (1.0 - leak);
@@ -207,6 +214,8 @@ public final class IndoorClimate {
      * комнату в «улицу»: свет проходит сквозь стекло, а воздух — нет.
      * Именно это значение использует HUD, поэтому его показания сходятся
      * с термодатчиками, считающими то же равновесие по тому же скану.
+     * Переполнение скана герметичность НЕ снижает: большое здание целиком
+     * остаётся помещением, иначе HUD в нём расходится с датчиками.
      */
     public static double enclosure(Player player) {
         return player.getPersistentData().contains(ENC_KEY)
@@ -231,8 +240,7 @@ public final class IndoorClimate {
         // превращает большой зал в «улицу». Сглаживаем, чтобы у проёма
         // не было мгновенных переключений.
         double encTarget = scan == null ? 0.0
-                : 1.0 - Math.min(1.0, scan.openings / Math.max(8.0, scan.volume * 0.04)
-                        + (scan.overflow ? 0.5 : 0.0));
+                : 1.0 - Math.min(1.0, scan.openings / Math.max(8.0, scan.volume * 0.04));
         double enc = enclosure(player);
         if (Double.isNaN(enc)) enc = encTarget;
         enc += (encTarget - enc) * 0.25;

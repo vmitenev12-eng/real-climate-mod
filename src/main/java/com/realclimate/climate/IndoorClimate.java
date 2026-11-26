@@ -411,6 +411,47 @@ public final class IndoorClimate {
                 : Double.NaN;
     }
 
+    /**
+     * Локальная струя приборов: рядом с дующим кондиционером или открытой
+     * решёткой с потоком воздух заметно ближе к температуре струи, чем средняя
+     * по комнате — как тепло рядом с включённым радиатором. Затухает с
+     * расстоянием (~5 блоков), суммарный предел ±3 °C: струя ощущается
+     * вплотную, но не превращает угол в морозилку.
+     *
+     * Влияет только на ОЩУЩАЕМУЮ температуру (HUD игрока, показания
+     * термодатчиков). Регуляторы самих приборов меряют объём комнаты без
+     * этого терма — иначе кондиционер измерял бы собственное дыхание
+     * и терял обратную связь с комнатой.
+     */
+    public static double localStream(Level level, BlockPos pos, double reference) {
+        double delta = 0.0;
+        for (BlockPos cur : BlockPos.betweenClosed(pos.offset(-4, -4, -4), pos.offset(4, 4, 4))) {
+            BlockState state = level.getBlockState(cur);
+            double emission = Double.NaN;
+            if (state.getBlock() instanceof ACIndoorBlock
+                    && state.hasProperty(ACIndoorBlock.ACTIVE)
+                    && state.getValue(ACIndoorBlock.ACTIVE)
+                    && level.getBlockEntity(cur) instanceof ACIndoorBlockEntity ac
+                    && ac.isEnabled()) {
+                emission = ac.getEmission();
+                if (Double.isNaN(emission)) emission = ac.getTargetTemp();
+            } else if (state.getBlock() instanceof GrilleBlock
+                    && level.getBlockEntity(cur) instanceof GrilleBlockEntity grille
+                    && grille.isOpen() && VentilationService.hasActiveAirflow(level, cur)) {
+                emission = grille.getEmission();
+                if (Double.isNaN(emission)) {
+                    emission = VentilationService.airflowTemperature(level, cur, grille.getTargetTemp());
+                }
+            }
+            if (Double.isNaN(emission)) continue;
+            double dist = Math.sqrt(cur.distSqr(pos));
+            if (dist >= 5.0) continue;
+            double w = 1.0 - dist / 5.0;
+            delta += (emission - reference) * 0.05 * w;
+        }
+        return Math.max(-3.0, Math.min(3.0, delta));
+    }
+
     /** Продвинуть температуру воздуха игрока к равновесию. Вызывается раз в 40 тиков. */
     public static void updatePlayer(ServerPlayer player) {
         Level level = player.level();
@@ -423,6 +464,9 @@ public final class IndoorClimate {
         if (Double.isNaN(current)) current = raw;
         RoomScan scan = findRoom(level, pos);
         double equilibrium = scan == null ? raw : equilibriumWithMass(level, pos, scan, raw);
+        // Струя кондиционера/решётки рядом с игроком ощущается отдельно
+        // от средней температуры комнаты (как тепло у радиатора).
+        equilibrium += localStream(level, pos, equilibrium);
         // Герметичность по скану объёма: 0 — открыто наружу, 1 — замкнутая
         // комната. Нормировка на размер комнаты: одна открытая дверь не
         // превращает большой зал в «улицу». Сглаживаем, чтобы у проёма

@@ -2,6 +2,7 @@ package com.realclimate.climate;
 
 import com.realclimate.RealClimate;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -22,12 +23,17 @@ import net.minecraftforge.fml.common.Mod;
  * хотя на улице плюс. Ванильная механика морозит только открытую небу
  * поверхность — здесь проверяются случайные точки вокруг игроков независимо
  * от неба. Нагрузка минимальная.
+ *
+ * Скорость зависит от температуры: у включённого на максимум радиатора снег
+ * сходит по несколько слоёв за проход и таяние расползается «лужицей» на
+ * соседние блоки, а вдали — едва подтаивает. Вода на сильном морозе
+ * замерзает от берегов к середине.
  */
 @Mod.EventBusSubscriber(modid = RealClimate.MODID)
 public final class SnowMeltService {
-    private static final int RADIUS = 24;
-    private static final int SAMPLES = 64;
-    private static final int SOURCE_RADIUS = 4;
+    private static final int RADIUS = 28;
+    private static final int SAMPLES = 80;
+    private static final int SOURCE_RADIUS = 6;
 
     private SnowMeltService() {}
 
@@ -59,7 +65,7 @@ public final class SnowMeltService {
                 }
             }
         }
-        return temp + Math.max(-25.0, Math.min(25.0, local));
+        return temp + Math.max(-40.0, Math.min(40.0, local));
     }
 
     private static void tickAround(ServerPlayer player) {
@@ -78,22 +84,34 @@ public final class SnowMeltService {
 
             if (state.is(Blocks.SNOW)) {
                 if (temp <= 0.5) continue;
-                float chance = (float) Math.min(1.0, (temp - 0.5) / 12.0);
+                // Скорость растёт с температурой: едва выше нуля — редкое
+                // подтаивание, рядом с горячим радиатором — почти каждый проход
+                // и сразу по несколько слоёв.
+                float chance = (float) Math.min(1.0, (temp - 0.5) / 8.0);
                 if (random.nextFloat() >= chance) continue;
-                int layers = state.getValue(SnowLayerBlock.LAYERS);
-                BlockState next = layers <= 1
-                        ? Blocks.AIR.defaultBlockState()
-                        : state.setValue(SnowLayerBlock.LAYERS, layers - 1);
-                level.setBlock(pos, next, 3);
+                meltSnowLayers(level, pos, state, 1 + (temp > 12.0 ? 1 : 0) + (temp > 24.0 ? 1 : 0));
+                // Тепло расползается лужицей: соседний снег подтаивает следом,
+                // поэтому вокруг радиатора видна именно «проплешина», а не
+                // равномерное редение всего сугроба.
+                if (temp > 8.0) {
+                    for (Direction dir : Direction.Plane.HORIZONTAL) {
+                        BlockPos n = pos.relative(dir);
+                        BlockState ns = level.getBlockState(n);
+                        if (ns.is(Blocks.SNOW) && random.nextFloat() < chance * 0.7f) {
+                            meltSnowLayers(level, n, ns, 1);
+                        }
+                    }
+                }
             } else if (state.is(Blocks.SNOW_BLOCK)) {
-                // Плотный снежный блок тает долго и только в устойчивый плюс.
-                if (temp <= 6.0) continue;
-                float chance = (float) Math.min(0.25, (temp - 6.0) / 120.0);
+                // Плотный снежный блок тает долго: сначала оседает в слои,
+                // потом слои сходят послойно — виден прогресс.
+                if (temp <= 4.0) continue;
+                float chance = (float) Math.min(0.5, (temp - 4.0) / 48.0);
                 if (random.nextFloat() >= chance) continue;
-                level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
+                level.setBlock(pos, Blocks.SNOW.defaultBlockState().setValue(SnowLayerBlock.LAYERS, 7), 3);
             } else if (state.is(Blocks.ICE)) {
-                if (temp <= 3.0) continue;
-                float chance = (float) Math.min(0.5, (temp - 3.0) / 20.0);
+                if (temp <= 2.0) continue;
+                float chance = (float) Math.min(0.75, (temp - 2.0) / 16.0);
                 if (random.nextFloat() >= chance) continue;
                 level.setBlock(pos, Blocks.WATER.defaultBlockState(), 3);
             } else if (state.is(Blocks.WATER) && state.getValue(LiquidBlock.LEVEL) == 0) {
@@ -101,10 +119,29 @@ public final class SnowMeltService {
                 // (например, бассейн в охлаждаемой комнате при уличном плюсе).
                 if (!ClimateConfig.WATER_FREEZE.get()) continue;
                 if (temp >= -0.5) continue;
-                float chance = (float) Math.min(1.0, (-0.5 - temp) / 12.0);
+                float chance = (float) Math.min(1.0, (-0.5 - temp) / 8.0);
                 if (random.nextFloat() >= chance) continue;
                 level.setBlock(pos, Blocks.ICE.defaultBlockState(), 3);
+                // На сильном морозе лёд нарастает от краёв к середине.
+                if (temp < -4.0) {
+                    for (Direction dir : Direction.Plane.HORIZONTAL) {
+                        BlockPos n = pos.relative(dir);
+                        BlockState ns = level.getBlockState(n);
+                        if (ns.is(Blocks.WATER) && ns.getValue(LiquidBlock.LEVEL) == 0
+                                && random.nextFloat() < 0.5f) {
+                            level.setBlock(n, Blocks.ICE.defaultBlockState(), 3);
+                        }
+                    }
+                }
             }
         }
+    }
+
+    private static void meltSnowLayers(ServerLevel level, BlockPos pos, BlockState state, int layersToRemove) {
+        int layers = state.getValue(SnowLayerBlock.LAYERS);
+        int remain = layers - layersToRemove;
+        level.setBlock(pos, remain <= 0
+                ? Blocks.AIR.defaultBlockState()
+                : state.setValue(SnowLayerBlock.LAYERS, remain), 3);
     }
 }

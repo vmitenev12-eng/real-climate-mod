@@ -30,6 +30,7 @@ import java.util.Set;
  */
 public final class IndoorClimate {
     private static final String AIR_KEY = "realclimate_air";
+    private static final String ENC_KEY = "realclimate_enc";
     private static final int MAX_ROOM_CELLS = 2048;
 
     private IndoorClimate() {}
@@ -79,6 +80,10 @@ public final class IndoorClimate {
     public static double roomEquilibrium(Level level, BlockPos origin, double rawAmbient) {
         RoomScan scan = scanRoom(level, origin, rawAmbient);
         if (scan == null) return rawAmbient;
+        return equilibrium(scan, rawAmbient);
+    }
+
+    private static double equilibrium(RoomScan scan, double rawAmbient) {
         double spread = 1.0 + Math.sqrt(scan.volume) / 8.0;
         double leak = Math.min(1.0, scan.openings * 0.25 + (scan.overflow ? 0.5 : 0.0));
         // Каждая решётка тянет воздух к температуре своей системы, но мощность
@@ -99,6 +104,20 @@ public final class IndoorClimate {
                 : Double.NaN;
     }
 
+    /**
+     * Насколько игрок «внутри помещения» по ТОПОЛОГИИ комнаты (скан объёма),
+     * а не по освещённости: 0 — улица или широкий проём, 1 — глухая комната.
+     * В отличие от shelter() (свет неба), остеклённое окно не превращает
+     * комнату в «улицу»: свет проходит сквозь стекло, а воздух — нет.
+     * Именно это значение использует HUD, поэтому его показания сходятся
+     * с термодатчиками, считающими то же равновесие по тому же скану.
+     */
+    public static double enclosure(Player player) {
+        return player.getPersistentData().contains(ENC_KEY)
+                ? player.getPersistentData().getDouble(ENC_KEY)
+                : Double.NaN;
+    }
+
     /** Продвинуть температуру воздуха игрока к равновесию. Вызывается раз в 40 тиков. */
     public static void updatePlayer(ServerPlayer player) {
         Level level = player.level();
@@ -110,7 +129,16 @@ public final class IndoorClimate {
         double current = getAir(player);
         if (Double.isNaN(current)) current = raw;
         double shelter = shelter(level, pos);
-        double equilibrium = roomEquilibrium(level, pos, raw);
+        RoomScan scan = scanRoom(level, pos, raw);
+        double equilibrium = scan == null ? raw : equilibrium(scan, raw);
+        // Герметичность по скану объёма: 0 — открыто наружу, 1 — замкнутая
+        // комната. Сглаживаем, чтобы у проёма не было мгновенных переключений.
+        double encTarget = scan == null ? 0.0
+                : 1.0 - Math.min(1.0, scan.openings * 0.25 + (scan.overflow ? 0.5 : 0.0));
+        double enc = enclosure(player);
+        if (Double.isNaN(enc)) enc = encTarget;
+        enc += (encTarget - enc) * 0.25;
+        player.getPersistentData().putDouble(ENC_KEY, enc);
         // На улице воздух меняется быстро, в помещении — инерционно.
         // У открытой двери сквозняк ускоряет обмен в обе стороны.
         double draft = draftFactor(level, pos);

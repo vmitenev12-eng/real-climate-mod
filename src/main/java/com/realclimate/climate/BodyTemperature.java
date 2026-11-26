@@ -29,7 +29,8 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Температура тела игрока. Считается на сервере раз в 40 тиков (2 с), без постоянной нагрузки.
+ * Температура тела игрока. Пакеты на клиент уходят каждые 10 тиков (0.5 с),
+ * тяжёлая воздушная масса помещения пересчитывается раз в 40 тиков.
  * Состояние хранится в persistentData игрока, поэтому переживает перезаход.
  *
  * Замерзание зависит от одежды и влаги: мокрая одежда почти не греет и на
@@ -38,15 +39,15 @@ import java.util.concurrent.ConcurrentHashMap;
  * Вода следует за температурой воздуха: в жару она тёплая, в мороз — ледяная.
  * В жару наоборот — перегрев от слишком тёплой одежды.
  *
- * Клиенту каждые 40 тиков уходят готовые значения (тело, воздух, утепление),
- * а клиент плавно «догоняет» их между пакетами — HUD живой, без ступенек.
+ * Клиент плавно «догоняет» значения между пакетами — HUD живой, без ступенек.
  */
 @Mod.EventBusSubscriber(modid = RealClimate.MODID)
 public final class BodyTemperature {
     public static final double NORMAL = 36.6;
     private static final String KEY = "realclimate_body";
     private static final String WET_KEY = "realclimate_wet";
-    private static final int PERIOD = 40;
+    private static final int PERIOD = 10;
+    private static final int INDOOR_PERIOD = 40;
     private static final Map<UUID, AmbientCache> AMBIENT_CACHE = new ConcurrentHashMap<>();
 
     // Клиентская копия серверных значений (заполняется только из пакета).
@@ -55,7 +56,7 @@ public final class BodyTemperature {
     private static volatile double syncedInsulation = Double.NaN;
     private static volatile long syncedAtMs = Long.MIN_VALUE;
 
-    // Клиентское сглаживание: сервер шлёт срез каждые 2 с, а отображение
+    // Клиентское сглаживание: сервер шлёт срез дважды в секунду, а отображение
     // непрерывно тянется к цели с постоянной времени ~0.3 с.
     private static double dispBody = Double.NaN;
     private static double dispAmbient = Double.NaN;
@@ -105,7 +106,7 @@ public final class BodyTemperature {
         syncedAtMs = System.currentTimeMillis();
     }
 
-    /** Синхронизация ещё живая? (пакет каждые 2 с, запас — 10 с) */
+    /** Синхронизация ещё живая? (пакет каждые 0.5 с, запас — 10 с) */
     private static boolean syncFresh() {
         return !Double.isNaN(syncedBody) && System.currentTimeMillis() - syncedAtMs < 10_000;
     }
@@ -151,8 +152,11 @@ public final class BodyTemperature {
         BlockPos pos = p.blockPosition();
         long gameTime = lv.getGameTime();
         AmbientCache cached = AMBIENT_CACHE.get(p.getUUID());
-        if (cached != null && cached.dimension.equals(lv.dimension()) && cached.pos.equals(pos)
-                && gameTime >= cached.gameTime && gameTime - cached.gameTime < 20) {
+        // Кэш действует ~0.75 с независимо от позиции: тяжёлый обход источников
+        // не гоняется каждые полсекунды, а при переходах значение просто
+        // догоняет с задержкой меньше секунды.
+        if (cached != null && cached.dimension.equals(lv.dimension())
+                && gameTime >= cached.gameTime && gameTime - cached.gameTime < 15) {
             return cached.temperature;
         }
 
@@ -173,15 +177,22 @@ public final class BodyTemperature {
         double instant = t + heat + vent;
 
         double result = instant;
-        double shelter = IndoorClimate.shelter(lv, pos);
+        // «Внутри/снаружи» определяется ТОПОЛОГИЕЙ комнаты (скан объёма в
+        // IndoorClimate), а не светом неба: остеклённое окно пропускает свет,
+        // но не воздух. Так HUD показывает ту же температуру, что и
+        // термодатчики, считающие равновесие по тому же скану.
+        double enc = IndoorClimate.enclosure(p);
+        if (Double.isNaN(enc)) enc = IndoorClimate.shelter(lv, pos); // первые секунды после входа
         double draft = IndoorClimate.draftFactor(lv, pos);
         double air = IndoorClimate.getAir(p);
         if (Double.isNaN(air)) air = t;
-        if (shelter > 0.01) {
-            // В помещении температура — это инерционная воздушная масса (IndoorClimate),
-            // плюс слабый локальный градиент у самих источников.
-            double indoor = air + heat * 0.25 + vent * 0.5;
-            double mixed = instant * (1.0 - shelter * 0.9) + indoor * (shelter * 0.9);
+        if (enc > 0.01) {
+            // В помещении температура — это инерционная воздушная масса
+            // (IndoorClimate): она уже включает радиаторы, кондиционеры и
+            // вентиляцию, поэтому локальный обход источников сюда не добавляем —
+            // иначе HUD «врёт» относительно датчиков рядом с приборами.
+            double indoor = air + vent * 0.5;
+            double mixed = instant * (1.0 - enc * 0.9) + indoor * (enc * 0.9);
             // Сквозняк у открытых дверей и щелей продувает в обе стороны:
             // уличный воздух мягко заходит в помещение — резких перепадов у проёма нет.
             result = mixed + (instant - mixed) * Math.min(1.0, draft * 0.6);
@@ -323,10 +334,10 @@ public final class BodyTemperature {
         if (e.phase != TickEvent.Phase.END || !(e.player instanceof ServerPlayer p)) return;
         if (p.tickCount % PERIOD != 0) return;
 
-        // Воздушная масса помещения и влага обновляются всегда — даже в креативе.
-        // Иначе HUD в креативе показывает «уличную» температуру внутри дома
-        // и навсегда расходится с термодатчиками.
-        IndoorClimate.updatePlayer(p);
+        // Воздушная масса помещения (тяжёлый скан объёма) — раз в 40 тиков,
+        // и для креатива тоже: иначе HUD в креативе показывает «уличную»
+        // температуру внутри дома и навсегда расходится с термодатчиками.
+        if (p.tickCount % INDOOR_PERIOD == 0) IndoorClimate.updatePlayer(p);
         updateWetness(p);
 
         if (p.isCreative() || p.isSpectator()) {
@@ -342,7 +353,7 @@ public final class BodyTemperature {
         // Мокрая одежда почти не держит тепло — пропорционально влаге.
         if (wet > 0.01) ins *= (1.0 - 0.65 * wet);
         double delta = amb - 20.0;
-        if (delta < 0) delta *= (1.0 - 0.8 * ins);   // броня защищает от холода
+        if (delta < 0) delta *= (1.0 - 0.6 * ins);   // броня защищает от холода, но не абсолютно
         else delta *= (1.0 + 0.3 * ins);              // и немного греет в жару
         // Перегрев от слишком тёплой одежды: чем жарче и теплее одет, тем хуже.
         if (amb > 26.0 && ins > 0.5) {
@@ -352,10 +363,10 @@ public final class BodyTemperature {
         if (wet > 0.05 && amb < 15.0) {
             delta -= (15.0 - amb) * 0.25 * wet;
         }
-        double target = NORMAL + Math.max(-9.0, Math.min(6.0, delta * 0.12));
+        double target = NORMAL + Math.max(-14.0, Math.min(7.0, delta * 0.12));
 
         double cur = get(p);
-        cur += (target - cur) * 0.05;
+        cur += (target - cur) * 0.02;
         set(p, cur);
         applyEffects(p, cur);
         // HUD показывает ровно эти значения — с инерцией помещения и мокрой одеждой.

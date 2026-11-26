@@ -1,5 +1,7 @@
 package com.realclimate.client;
 
+import com.mojang.blaze3d.platform.GlStateManager;
+import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
@@ -10,11 +12,12 @@ import com.realclimate.climate.VentilationService;
 import com.realclimate.tileentity.ACOutdoorBlockEntity;
 import com.realclimate.tileentity.ControlPanelBlockEntity;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.RenderStateShard;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.client.event.RenderGuiOverlayEvent;
 import net.minecraftforge.client.event.RenderLevelStageEvent;
@@ -32,6 +35,10 @@ public final class KeyOverlayRenderer {
     private static List<LinkLine> cachedLinkLines = List.of();
     private static net.minecraft.client.multiplayer.ClientLevel cachedLevel;
     private static long lastLinkScan = Long.MIN_VALUE;
+
+    /** Ванильная текстура инея из сыпучего снега — для предупреждения о замерзании. */
+    private static final ResourceLocation FROST_TEXTURE =
+            new ResourceLocation("textures/misc/powder_snow_outline.png");
 
     private KeyOverlayRenderer() {}
 
@@ -210,7 +217,7 @@ public final class KeyOverlayRenderer {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.level == null) return;
 
-        // HUD показывает серверные значения (приходят каждые 2 с), сглаженные
+        // HUD показывает серверные значения (приходят каждые 0.5 с), сглаженные
         // на клиенте — цифры живые, без ступенек и без расхождения с датчиками.
         double body = BodyTemperature.bodyDisplay(mc.player);
         double ambient = BodyTemperature.ambientDisplay(mc.player);
@@ -218,6 +225,10 @@ public final class KeyOverlayRenderer {
 
         int h = e.getGuiGraphics().guiHeight();
         int w = e.getGuiGraphics().guiWidth();
+
+        // Предупреждения о замерзании/перегреве — под текстом HUD, но над миром.
+        if (!mc.options.hideGui) renderThermalWarnings(e.getGuiGraphics(), body, w, h);
+
         // Текст поднят выше панели инструментов и брони, чтобы не перекрывать их.
         if (w < 320) {
             e.getGuiGraphics().drawString(mc.font, Component.literal(String.format("Тело %.1f°C", body)),
@@ -240,6 +251,58 @@ public final class KeyOverlayRenderer {
                 : "ПКМ: связать; Shift+ПКМ: разорвать";
         e.getGuiGraphics().drawString(mc.font, Component.literal(keyHint),
                 6, w < 320 ? h - 94 : h - 78, 0xFFFFFFFF, true);
+    }
+
+    /**
+     * Визуальные предупреждения ДО того, как начнутся эффекты и урон.
+     * Замерзание: ванильный иней (как в сыпучем снегу) наползает с краёв
+     * постепенно — от 36.3 °C тела (лёгкий намёк) до 31 °C (плотный иней,
+     * дальше уже урон). Перегрев: оранжевая пелена пара от краёв экрана —
+     * от 37.3 °C до 40.5 °C. В креативе тело всегда 36.6 °C, так что
+     * предупреждения там не показываются — это выживальческая механика.
+     */
+    private static void renderThermalWarnings(GuiGraphics g, double body, int w, int h) {
+        double frost = Math.max(0.0, Math.min(1.0, (36.3 - body) / 5.3));
+        if (frost > 0.02) {
+            float a = (float) (frost * frost * 0.95);   // квадратично: мягкое начало
+            RenderSystem.disableDepthTest();
+            RenderSystem.depthMask(false);
+            RenderSystem.enableBlend();
+            RenderSystem.blendFuncSeparate(GlStateManager.SourceFactor.SRC_ALPHA,
+                    GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA,
+                    GlStateManager.SourceFactor.ONE, GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA);
+            g.setColor(1.0f, 1.0f, 1.0f, a);
+            g.blit(FROST_TEXTURE, 0, 0, -90, 0.0f, 0.0f, w, h, w, h);
+            g.setColor(1.0f, 1.0f, 1.0f, 1.0f);
+            RenderSystem.disableBlend();
+            RenderSystem.depthMask(true);
+            RenderSystem.enableDepthTest();
+        }
+
+        double heat = Math.max(0.0, Math.min(1.0, (body - 37.3) / 3.2));
+        if (heat <= 0.02) return;
+        double base = heat * heat;
+        // Лёгкая общая рыжина + градиентные полосы пара от всех четырёх краёв.
+        tint(g, 0, 0, w, h, (int) (base * 0.10 * 255), 255, 100, 20);
+        int strips = 7;
+        int bandY = Math.max(20, h / 5);
+        int bandX = Math.max(24, w / 6);
+        for (int i = 0; i < strips; i++) {
+            double f = 1.0 - (double) i / strips;
+            int alpha = (int) (base * f * f * 0.5 * 255);
+            if (alpha < 3) continue;
+            int y0 = bandY * i / strips, y1 = bandY * (i + 1) / strips;
+            int x0 = bandX * i / strips, x1 = bandX * (i + 1) / strips;
+            tint(g, 0, y0, w, y1, alpha, 255, 110, 25);              // верх
+            tint(g, 0, h - y1, w, h - y0, alpha, 255, 110, 25);      // низ
+            tint(g, x0, y0, x1, h - y0, alpha, 255, 110, 25);        // лево
+            tint(g, w - x1, y0, w - x0, h - y0, alpha, 255, 110, 25); // право
+        }
+    }
+
+    private static void tint(GuiGraphics g, int x0, int y0, int x1, int y1, int alpha, int r, int gg, int b) {
+        if (alpha <= 0 || x1 <= x0 || y1 <= y0) return;
+        g.fill(x0, y0, x1, y1, (alpha << 24) | (r << 16) | (gg << 8) | b);
     }
 
     private static boolean isHoldingInstallationKey(Minecraft mc) {

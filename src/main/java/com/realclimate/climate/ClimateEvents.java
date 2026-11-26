@@ -40,6 +40,7 @@ public final class ClimateEvents {
         ClimateService.stop();
         VentilationService.clear();
         RealTimeService.clear();
+        IndoorClimate.clear();
     }
 
     @SubscribeEvent

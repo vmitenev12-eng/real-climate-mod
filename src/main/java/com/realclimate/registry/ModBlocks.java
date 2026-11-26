@@ -23,6 +23,7 @@ public final class ModBlocks {
 
     public static final RegistryObject<Item> HAMMER = ITEMS.register("hammer", () -> new HammerItem(new Item.Properties().stacksTo(1)));
 
+    public static final RegistryObject<Block> VENT_SOLID;
     public static final RegistryObject<Block> AC_OUTDOOR;
     public static final RegistryObject<Block> AC_INDOOR;
     public static final RegistryObject<Block> RADIATOR;
@@ -57,6 +58,11 @@ public final class ModBlocks {
         reg("vent_cross_side", () -> new FacingBlock(metal()), true);
         reg("vent_cross_up", () -> new FacingBlock(metal()), true);
         reg("vent_ceiling_grille", () -> new FacingBlock(metal()), true);
+        // Сплошной полнокубовый участок магистрали (для шахт из миниблоков):
+        // без noOcclusion — это обычный полный блок, соседние грани скрываются.
+        VENT_SOLID = reg("vent_solid", () -> new SolidVentBlock(
+                BlockBehaviour.Properties.of().strength(2.0f, 6.0f).sound(SoundType.METAL)
+                        .requiresCorrectToolForDrops()), true);
 
         // Оборудование (с TE)
         AC_OUTDOOR = reg("ac_outdoor", () -> new ACOutdoorBlock(metal()), true);

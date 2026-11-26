@@ -16,7 +16,9 @@ import net.minecraft.world.level.Level;
  * наружный блок), решётка работает как термостат: раз в секунду замеряет
  * равновесие комнаты и докручивает температуру потока (emission), пока
  * комната не выйдет на уставку своей системы — холод/тепло реально
- * «излучается» из решётки, а не тянется к цели на треть пути.
+ * «излучается» из решётки, а не тянется к цели на треть пути. Коридор
+ * потока широкий (±60° от рабочего диапазона, пределы −80..+160 °C),
+ * чтобы морозные уставки были достижимы даже с утечками.
  */
 public class GrilleBlockEntity extends BlockEntity {
     private boolean open = true;
@@ -72,9 +74,9 @@ public class GrilleBlockEntity extends BlockEntity {
         }
         if (Math.abs(error) > 0.05) {
             be.emission += error * 0.9;
-            double lo = Math.min(target, raw) - 45.0;
-            double hi = Math.max(target, raw) + 45.0;
-            be.emission = Math.max(-45.0, Math.min(140.0, Math.max(lo, Math.min(hi, be.emission))));
+            double lo = Math.min(target, raw) - 60.0;
+            double hi = Math.max(target, raw) + 60.0;
+            be.emission = Math.max(-80.0, Math.min(160.0, Math.max(lo, Math.min(hi, be.emission))));
             be.setChanged();
         }
     }

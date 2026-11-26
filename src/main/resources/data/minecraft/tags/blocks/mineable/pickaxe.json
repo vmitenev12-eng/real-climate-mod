@@ -12,6 +12,7 @@
   "real_climate:vent_cross_side",
   "real_climate:vent_cross_up",
   "real_climate:vent_ceiling_grille",
+  "real_climate:vent_solid",
   "real_climate:ac_indoor",
   "real_climate:ac_outdoor",
   "real_climate:radiator",

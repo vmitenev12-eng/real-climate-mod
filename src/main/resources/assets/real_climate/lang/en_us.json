@@ -1,6 +1,7 @@
 {
  "block.real_climate.vent_straight": "Straight Vent Duct",
  "block.real_climate.vent_straight_up": "Vertical Vent Duct",
+ "block.real_climate.vent_solid": "Solid Vent Duct",
  "block.real_climate.vent_elbow_side": "Vent Elbow 90° (Side)",
  "block.real_climate.vent_elbow_up": "Vent Elbow 90° (Up)",
  "block.real_climate.vent_elbow_down": "Vent Elbow 90° (Down)",

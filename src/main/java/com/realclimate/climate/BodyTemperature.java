@@ -39,6 +39,11 @@ import java.util.concurrent.ConcurrentHashMap;
  * Вода следует за температурой воздуха: в жару она тёплая, в мороз — ледяная.
  * В жару наоборот — перегрев от слишком тёплой одежды.
  *
+ * Солнце и тень: под прямыми лучами днём ощутимо теплее, в тени — прохладнее.
+ * Высота солнца берётся из реального локального времени долготы
+ * (RealTimeService), поэтому эффект согласован с реальной моделью
+ * день/ночь планеты; ночью и в дождь его нет.
+ *
  * Клиент плавно «догоняет» значения между пакетами — HUD живой, без ступенек.
  */
 @Mod.EventBusSubscriber(modid = RealClimate.MODID)
@@ -171,6 +176,23 @@ public final class BodyTemperature {
         if (!lv.canSeeSky(pos) && pos.getY() < lv.getSeaLevel() - 8) {
             // глубокие пещеры стабилизируются около +10 °C
             t = t * 0.4 + 6.0;
+        }
+        // Солнце и тень: под прямыми лучами днём теплее, в тени — прохладнее.
+        // Высота солнца — по реальному локальному времени долготы
+        // (RealTimeService), так что эффект согласован с моделью день/ночь;
+        // ночью и в дождь его нет. Стеклянная крыша пропускает лучи — теплица.
+        if (!lv.isRaining() && !lv.isThundering()) {
+            double hours = RealTimeService.localHours(p.getX());
+            double sun = Math.sin(Math.PI * (hours - 6.0) / 12.0);
+            if (sun > 0.0) {
+                if (lv.canSeeSky(pos)) {
+                    t += 3.5 * sun;
+                } else if (lv.getBrightness(LightLayer.SKY, pos) > 4) {
+                    // Тень под навесом или листвой: небо ещё светит сюда, но
+                    // прямых лучей нет — чуть прохладнее, чем под открытым небом.
+                    t -= 1.2 * sun;
+                }
+            }
         }
         double heat = heatNearby(lv, pos);
         double vent = VentilationService.temperatureOffset(lv, pos, t);

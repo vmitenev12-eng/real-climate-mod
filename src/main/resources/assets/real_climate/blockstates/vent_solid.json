@@ -1,0 +1,5 @@
+{
+ "variants": {
+  "": { "model": "real_climate:block/vent_solid" }
+ }
+}

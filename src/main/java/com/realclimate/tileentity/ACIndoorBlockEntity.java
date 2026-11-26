@@ -24,7 +24,9 @@ import net.minecraft.network.protocol.game.ClientGamePacketListener;
  * (IndoorClimate) и докручивает температуру струи (emission), пока комната
  * не выйдет на уставку. Поэтому заданная на пульте температура достигается,
  * а не «тянется на треть пути», как при фиксированной мощности. Стены, щели
- * и соседний радиатор компенсируются регулятором автоматически.
+ * и соседний радиатор компенсируются регулятором автоматически. Коридор
+ * струи широкий (±60° от рабочего диапазона, пределы −80..+160 °C), чтобы
+ * морозные уставки (−20 °C) были достижимы и при открытой двери.
  * ACTIVE = блок реально дует (есть запрос по температуре).
  */
 public class ACIndoorBlockEntity extends BlockEntity {
@@ -135,9 +137,9 @@ public class ACIndoorBlockEntity extends BlockEntity {
             if (Double.isNaN(be.emission)) be.emission = target;
             if (Math.abs(error) > 0.05) {
                 be.emission += error * 0.9;
-                double lo = Math.min(target, raw) - 45.0;
-                double hi = Math.max(target, raw) + 45.0;
-                be.emission = Math.max(-45.0, Math.min(140.0, Math.max(lo, Math.min(hi, be.emission))));
+                double lo = Math.min(target, raw) - 60.0;
+                double hi = Math.max(target, raw) + 60.0;
+                be.emission = Math.max(-80.0, Math.min(160.0, Math.max(lo, Math.min(hi, be.emission))));
                 be.setChanged();
             }
         } else if (!Double.isNaN(be.emission)) {

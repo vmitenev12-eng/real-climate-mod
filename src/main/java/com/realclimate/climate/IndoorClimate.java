@@ -2,6 +2,7 @@ package com.realclimate.climate;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
@@ -10,7 +11,9 @@ import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.ArrayDeque;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Воздушная масса помещения.
@@ -33,13 +36,34 @@ import java.util.Set;
  * вносит теплопроводность area·λ/толщина (ThermalProperties), поэтому
  * деревянная бытовка держит тепло, каменный дом — плохо, тонкая стенка
  * из миниблоков — хуже всего.
+ *
+ * Тепловая масса помещения: стены, пол и потолок накапливают тепло/холод.
+ * Когда приборы выключены, комната не остывает мгновенно — масса отдаёт
+ * тепло обратно в воздух и постепенно развеивается через ограждения
+ * (шерсть/дерево — медленно, камень — быстрее, металл — почти сразу).
+ * Открытая дверь или дыра в стене резко ускоряет выветривание: воздух
+ * стремительно принимает уличную температуру. Если дверь приоткрыли
+ * и закрыли — прогретые стены быстро возвращают воздух почти к прежней
+ * температуре, и проветривание почти незаметно.
  */
 public final class IndoorClimate {
     private static final String AIR_KEY = "realclimate_air";
     private static final String ENC_KEY = "realclimate_enc";
     private static final int MAX_ROOM_CELLS = 2048;
 
+    /**
+     * Тепловая масса мира, привязанная к блокам 8×8×8: стены помещения
+     * помнят свою температуру между замерами и отдают её воздуху.
+     * Только серверная сторона — клиентские замеры сюда не пишут.
+     */
+    private static final Map<MassKey, MassCell> MASS_CELLS = new ConcurrentHashMap<>();
+
     private IndoorClimate() {}
+
+    /** Очистка тепловой массы при остановке сервера. */
+    public static void clear() {
+        MASS_CELLS.clear();
+    }
 
     /** 0 — на открытом воздухе, 1 — полностью внутри помещения. */
     public static double shelter(Level level, BlockPos pos) {
@@ -80,21 +104,19 @@ public final class IndoorClimate {
      * Равновесная температура воздуха в помещении вокруг точки. Учитывает
      * источники тепла, внутренние блоки сплит-систем, подключённые
      * вентиляционные решётки, утечки наружу и теплопроводность ограждающих
-     * конструкций (стены, окна, тонкие стенки из миниблоков). Если объём не
-     * замкнут — равновесие стремится к уличной температуре.
+     * конструкций (стены, окна, тонкие стенки из миниблоков), а также
+     * тепловую массу прогретых/охлаждённых стен. Если объём не замкнут —
+     * равновесие стремится к уличной температуре.
      */
     public static double roomEquilibrium(Level level, BlockPos origin, double rawAmbient) {
         RoomScan scan = scanRoom(level, origin, rawAmbient);
         if (scan == null) return rawAmbient;
-        return equilibrium(scan, rawAmbient);
+        return equilibriumWithMass(level, origin, scan, rawAmbient);
     }
 
     private static double equilibrium(RoomScan scan, double rawAmbient) {
         double spread = 1.0 + Math.sqrt(scan.volume) / 8.0;
-        // Утечка нормируется на размер комнаты: открытая дверь в большом зале
-        // сквозит и тянет тепло, но не превращает весь объём в улицу.
-        double norm = Math.max(5.0, scan.volume * 0.04);
-        double leak = Math.min(1.0, scan.openings / norm * 1.2 + (scan.overflow ? 0.5 : 0.0));
+        double leak = leakOf(scan);
         // Ограждающие конструкции: envelope = Σ (площадь × λ / толщина).
         // Большой envelope — тонкие/металлические/стеклянные стены, тепло уходит.
         double envelopeDamping = 1.0 / (1.0 + scan.envelope * 0.12);
@@ -114,6 +136,61 @@ public final class IndoorClimate {
             forced += (scan.grilleEmissionSum / scan.grilleCount - rawAmbient) * coupling;
         }
         return rawAmbient + passive + forced * (1.0 - leak);
+    }
+
+    /** Утечка нормируется на размер комнаты: открытая дверь в большом зале
+     * сквозит и тянет тепло, но не превращает весь объём в улицу. */
+    private static double leakOf(RoomScan scan) {
+        double norm = Math.max(8.0, scan.volume * 0.04);
+        return Math.min(1.0, scan.openings / norm * 1.2 + (scan.overflow ? 0.5 : 0.0));
+    }
+
+    /**
+     * Равновесие с учётом тепловой массы ограждений: нагретые стены тянут
+     * воздух к своей температуре. Связь сильная у массивных стен и слабая
+     * у тонких металлических, а при утечках (открытая дверь, дыра наружу)
+     * почти исчезает — воздух тут же становится уличным.
+     */
+    private static double equilibriumWithMass(Level level, BlockPos origin, RoomScan scan, double rawAmbient) {
+        double eq = equilibrium(scan, rawAmbient);
+        if (level.isClientSide) return eq;
+        if (scan.overflow && scan.volume >= MAX_ROOM_CELLS) return eq;
+        double leak = leakOf(scan);
+        double wallFactor = 1.0 / (1.0 + scan.envelope / Math.max(30.0, scan.volume) * 0.05);
+        double coupling = 0.88 * wallFactor * (1.0 - leak);
+        return thermalMass(level, origin, eq, rawAmbient, coupling, scan);
+    }
+
+    /**
+     * Температура воздуха с учётом стен и обновление массы ячейки.
+     * Масса догоняет температуру воздуха, которую сама же и формирует,
+     * поэтому эффективная скорость остывания пропорциональна (1 − coupling):
+     * хорошо держащие тепло стены остывают медленнее всего. Скорость
+     * выветривания растёт с теплопроводностью ограждения и с утечками.
+     */
+    private static double thermalMass(Level level, BlockPos origin, double eq, double raw,
+                                      double coupling, RoomScan scan) {
+        long now = level.getGameTime();
+        MassCell cell = MASS_CELLS.computeIfAbsent(
+                new MassKey(level.dimension(), origin.getX() >> 3, origin.getY() >> 3, origin.getZ() >> 3),
+                key -> new MassCell(eq, now));
+        long dt = now - cell.gameTime;
+        cell.gameTime = now;
+        double air = eq + coupling * (cell.temp - raw);
+        if (dt > 0) {
+            dt = Math.min(dt, 2400);
+            double lossRate = 0.3
+                    + Math.min(2.5, scan.envelope / Math.max(20.0, scan.volume) * 0.5)
+                    + Math.min(2.5, scan.openings * 0.3)
+                    + (scan.overflow ? 1.0 : 0.0);
+            double k = 1.0 - Math.exp(-dt * lossRate * 3.0 / 6000.0);
+            cell.temp += (air - cell.temp) * k;
+        }
+        // Периодическая чистка старых ячеек, чтобы карта не разрасталась.
+        if (MASS_CELLS.size() > 512) {
+            MASS_CELLS.entrySet().removeIf(e -> now - e.getValue().gameTime > 24000);
+        }
+        return air;
     }
 
     /** Текущая температура воздуха вокруг игрока (с инерцией помещения). */
@@ -148,13 +225,13 @@ public final class IndoorClimate {
         double current = getAir(player);
         if (Double.isNaN(current)) current = raw;
         RoomScan scan = scanRoom(level, pos, raw);
-        double equilibrium = scan == null ? raw : equilibrium(scan, raw);
+        double equilibrium = scan == null ? raw : equilibriumWithMass(level, pos, scan, raw);
         // Герметичность по скану объёма: 0 — открыто наружу, 1 — замкнутая
         // комната. Нормировка на размер комнаты: одна открытая дверь не
         // превращает большой зал в «улицу». Сглаживаем, чтобы у проёма
         // не было мгновенных переключений.
         double encTarget = scan == null ? 0.0
-                : 1.0 - Math.min(1.0, scan.openings / Math.max(5.0, scan.volume * 0.04)
+                : 1.0 - Math.min(1.0, scan.openings / Math.max(8.0, scan.volume * 0.04)
                         + (scan.overflow ? 0.5 : 0.0));
         double enc = enclosure(player);
         if (Double.isNaN(enc)) enc = encTarget;
@@ -245,4 +322,16 @@ public final class IndoorClimate {
     private record RoomScan(int volume, double openings, double heat, double envelope,
                             int acCount, double acEmissionSum,
                             int grilleCount, double grilleEmissionSum, boolean overflow) {}
+
+    private record MassKey(ResourceKey<Level> dimension, int x, int y, int z) {}
+
+    private static final class MassCell {
+        double temp;
+        long gameTime;
+
+        MassCell(double temp, long gameTime) {
+            this.temp = temp;
+            this.gameTime = gameTime;
+        }
+    }
 }

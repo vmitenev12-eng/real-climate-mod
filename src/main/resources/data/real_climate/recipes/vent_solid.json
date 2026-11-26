@@ -1,0 +1,12 @@
+{
+ "type": "minecraft:crafting_shaped",
+ "pattern": [
+  "III",
+  "III",
+  "III"
+ ],
+ "key": {
+  "I": { "item": "minecraft:iron_ingot" }
+ },
+ "result": { "item": "real_climate:vent_solid", "count": 8 }
+}

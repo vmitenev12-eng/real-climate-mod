@@ -86,7 +86,13 @@ public final class KeyOverlayRenderer {
         }
 
         long gameTime = mc.level.getGameTime();
-        if (cachedLevel == mc.level && gameTime - lastLinkScan < LINK_SCAN_INTERVAL_TICKS) return;
+        // ВАЖНО: lastLinkScan == Long.MIN_VALUE — маркер «скана ещё не было».
+        // Без этой гардии gameTime - Long.MIN_VALUE переполняет long и даёт
+        // огромное отрицательное число: условие «прошло < 20 тиков» истинно
+        // всегда, и после повторного взятия ключа в руку скан не запускался
+        // никогда (линии показывались только при входе в мир с ключом в руке).
+        if (cachedLevel == mc.level && lastLinkScan != Long.MIN_VALUE
+                && gameTime - lastLinkScan < LINK_SCAN_INTERVAL_TICKS) return;
         cachedLevel = mc.level;
         lastLinkScan = gameTime;
 
@@ -252,17 +258,16 @@ public final class KeyOverlayRenderer {
 
         if (!isHoldingInstallationKey(mc)) return;
 
-        String keyHint = w < 320
-                ? "Shift+ПКМ: разорвать"
-                : "ПКМ: связать; Shift+ПКМ: разорвать";
-        e.getGuiGraphics().drawString(mc.font, Component.literal(keyHint),
-                6, w < 320 ? h - 94 : h - 78, 0xFFFFFFFF, true);
-        // Диагностика: сколько связей сейчас видит клиент. Если 0 при явно
+        // Диагностика в одну строку с подсказкой, чтобы круг джойстика
+        // PojavLauncher снизу слева не закрывал число. Если связей 0 при явно
         // привязанных блоках — данные не дошли до клиента; если > 0, а линий
         // не видно — проблема в отрисовке (напишите нам с этим числом).
-        e.getGuiGraphics().drawString(mc.font,
-                Component.literal("Связей рядом: " + cachedLinkLines.size()),
-                6, w < 320 ? h - 104 : h - 90, 0xFFB0E0FF, true);
+        String keyHint = (w < 320
+                ? "Shift+ПКМ: разорвать"
+                : "ПКМ: связать; Shift+ПКМ: разорвать")
+                + "  |  Связей: " + cachedLinkLines.size();
+        e.getGuiGraphics().drawString(mc.font, Component.literal(keyHint),
+                6, w < 320 ? h - 94 : h - 78, 0xFFFFFFFF, true);
     }
 
     /**

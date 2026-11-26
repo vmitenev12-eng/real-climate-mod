@@ -174,7 +174,7 @@ public final class IndoorClimate {
      * вентиляционные решётки, утечки наружу и теплопроводность ограждающих
      * конструкций (стены, окна, тонкие стенки из миниблоков), а также
      * тепловую массу прогретых/охлаждённых стен. Если объём не замкнут —
-     * равновесие стремится к уличной температуре.
+ * равновесие стремится к уличной температуре.
      */
     public static double roomEquilibrium(Level level, BlockPos origin, double rawAmbient) {
         RoomScan scan = findRoom(level, origin);
@@ -259,6 +259,15 @@ public final class IndoorClimate {
         return rawAmbient + passive + forced * (1.0 - leak);
     }
 
+    /** Потолочная решётка магистрали (vent_ceiling_grille) — декоративный
+     * терминал без блока-сущности; распознаём по id, как трассировка воздуховода. */
+    private static boolean isCeilingGrille(BlockState state) {
+        net.minecraft.resources.ResourceLocation id =
+                net.minecraftforge.registries.ForgeRegistries.BLOCKS.getKey(state.getBlock());
+        return id != null && id.getNamespace().equals("real_climate")
+                && id.getPath().equals("vent_ceiling_grille");
+    }
+
     /**
      * Живой пересчёт вклада приточных устройств: геометрия комнаты берётся
      * из кэша, но состояние кондиционеров и решёток читается заново при
@@ -286,15 +295,24 @@ public final class IndoorClimate {
         double grilleEmissionSum = 0.0;
         for (BlockPos pos : scan.grillePositions) {
             if (!level.isLoaded(pos)) continue;
-            if (!(level.getBlockState(pos).getBlock() instanceof GrilleBlock)) continue;
-            if (level.getBlockEntity(pos) instanceof GrilleBlockEntity grille
-                    && grille.isOpen() && VentilationService.hasActiveAirflow(level, pos)) {
-                grilleCount++;
-                double emission = grille.getEmission();
-                if (Double.isNaN(emission)) {
-                    emission = VentilationService.airflowTemperature(level, pos, grille.getTargetTemp());
+            BlockState state = level.getBlockState(pos);
+            if (state.getBlock() instanceof GrilleBlock) {
+                if (level.getBlockEntity(pos) instanceof GrilleBlockEntity grille
+                        && grille.isOpen() && VentilationService.hasActiveAirflow(level, pos)) {
+                    grilleCount++;
+                    double emission = grille.getEmission();
+                    if (Double.isNaN(emission)) {
+                        emission = VentilationService.airflowTemperature(level, pos, grille.getTargetTemp());
+                    }
+                    grilleEmissionSum += emission;
                 }
-                grilleEmissionSum += emission;
+            } else if (isCeilingGrille(state) && VentilationService.hasActiveAirflow(level, pos)) {
+                // У потолочной решётки нет блока-сущности и своего термостата:
+                // из магистрали дует ровно та температура, что гонит наружный
+                // блок (уставка пульта). Без активного потока — не устройство.
+                grilleCount++;
+                grilleEmissionSum += VentilationService.airflowTemperature(
+                        level, pos, ClimateService.getTemperature(level, pos));
             }
         }
         return new DeviceTerms(acCount, acEmissionSum, grilleCount, grilleEmissionSum);
@@ -442,6 +460,10 @@ public final class IndoorClimate {
                 if (Double.isNaN(emission)) {
                     emission = VentilationService.airflowTemperature(level, cur, grille.getTargetTemp());
                 }
+            } else if (isCeilingGrille(state) && VentilationService.hasActiveAirflow(level, cur)) {
+                // Струя из потолочной решётки ощущается так же, как из обычной.
+                emission = VentilationService.airflowTemperature(
+                        level, cur, ClimateService.getTemperature(level, cur));
             }
             if (Double.isNaN(emission)) continue;
             double dist = Math.sqrt(cur.distSqr(pos));
@@ -539,8 +561,11 @@ public final class IndoorClimate {
                 if (state.getBlock() instanceof ACIndoorBlock
                         && level.getBlockEntity(neighbor) instanceof ACIndoorBlockEntity) {
                     acPositions.add(neighbor.immutable());
-                } else if (state.getBlock() instanceof GrilleBlock
-                        && level.getBlockEntity(neighbor) instanceof GrilleBlockEntity) {
+                } else if ((state.getBlock() instanceof GrilleBlock
+                        && level.getBlockEntity(neighbor) instanceof GrilleBlockEntity)
+                        || isCeilingGrille(state)) {
+                    // Потолочная решётка (vent_ceiling_grille) — тоже приточное
+                    // устройство, хоть и без блока-сущности: терминал магистрали.
                     grillePositions.add(neighbor.immutable());
                 } else {
                     heat += BodyTemperature.sourceStrength(level, neighbor, state);

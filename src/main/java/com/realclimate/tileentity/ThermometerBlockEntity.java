@@ -16,6 +16,13 @@ import net.minecraft.world.level.block.state.BlockState;
  * Логика термодатчика: ведёт температуру воздуха в точке установки с инерцией
  * помещения, как и у игроков (IndoorClimate), и отдаёт её пульту управления.
  *
+ * Долговременная инерция комнаты живёт в тепловой массе стен (IndoorClimate),
+ * поэтому сам прибор откликается быстро (~15-20 с до цели), как и HUD
+ * игрока: медленный фильтр датчика (7% за замер) заставлял его минутами
+ * показывать вчерашнюю температуру, а зависимость от освещённости ещё
+ * и раскидывала показания соседних датчиков — у стекла они ползли быстрее,
+ * чем в тёмном углу.
+ *
  * Клиентский экран обновляется через sendBlockUpdated: при первом замере,
  * при заметном изменении и принудительно раз в 30 с (сердцебиение) — иначе
  * цифра на датчике навсегда оставалась той, что была при загрузке чанка.
@@ -48,8 +55,10 @@ public class ThermometerBlockEntity extends BlockEntity {
         double equilibrium = IndoorClimate.roomEquilibrium(level, pos, raw);
         boolean first = Double.isNaN(be.airTemp);
         if (first) be.airTemp = equilibrium;
+        // Прибор откликается быстро и одинаково в любой точке комнаты:
+        // инерцию помещения даёт тепловая масса стен, а не фильтр датчика.
         double shelter = IndoorClimate.shelter(level, pos);
-        double rate = 0.45 * (1.0 - shelter) + 0.07 * shelter;
+        double rate = 0.45 * (1.0 - shelter) + 0.25 * shelter;
         double updated = be.airTemp + (equilibrium - be.airTemp) * rate;
         boolean heartbeat = level.getGameTime() % 600 == 0;
         if (first || heartbeat || Math.abs(updated - be.airTemp) > 0.02) {

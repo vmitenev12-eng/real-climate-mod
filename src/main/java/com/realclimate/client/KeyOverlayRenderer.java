@@ -147,9 +147,15 @@ public final class KeyOverlayRenderer {
             float bx = link.to.getX() + 0.5f;
             float by = link.to.getY() + 0.5f;
             float bz = link.to.getZ() + 0.5f;
-            ribbon(buf, m, cam, ax, ay, az, bx, by, bz, 0.03f, link.r, link.g, link.b, 170);
-            marker(buf, m, cam, ax, ay, az, 0.08f, link.r, link.g, link.b, 220);
-            marker(buf, m, cam, bx, by, bz, 0.12f, link.r, link.g, link.b, 230);
+            // Двухслойная лента: широкое мягкое свечение + яркая белёсая жилка.
+            // На маленьком экране телефона тонкая полупрозрачная линия терялась.
+            int cr = link.r + (255 - link.r) * 3 / 5;
+            int cg = link.g + (255 - link.g) * 3 / 5;
+            int cb = link.b + (255 - link.b) * 3 / 5;
+            ribbon(buf, m, cam, ax, ay, az, bx, by, bz, 0.10f, link.r, link.g, link.b, 80);
+            ribbon(buf, m, cam, ax, ay, az, bx, by, bz, 0.035f, cr, cg, cb, 240);
+            marker(buf, m, cam, ax, ay, az, 0.10f, link.r, link.g, link.b, 200);
+            marker(buf, m, cam, bx, by, bz, 0.16f, cr, cg, cb, 230);
         }
         bufferSource.endBatch(LinkQuads.INSTANCE);
         pose.popPose();
@@ -198,7 +204,7 @@ public final class KeyOverlayRenderer {
                 x - rx - ux, y - ry - uy, z - rz - uz,
                 x + rx - ux, y + ry - uy, z + rz - uz,
                 x + rx + ux, y + ry + uy, z + rz + uz,
-                x - rx + ux, y - ry + uy, z - rz + uz,
+                x - rx - ux, y - ry - uy, z - rz - uz,
                 r, g, b, alpha);
     }
 
@@ -251,6 +257,12 @@ public final class KeyOverlayRenderer {
                 : "ПКМ: связать; Shift+ПКМ: разорвать";
         e.getGuiGraphics().drawString(mc.font, Component.literal(keyHint),
                 6, w < 320 ? h - 94 : h - 78, 0xFFFFFFFF, true);
+        // Диагностика: сколько связей сейчас видит клиент. Если 0 при явно
+        // привязанных блоках — данные не дошли до клиента; если > 0, а линий
+        // не видно — проблема в отрисовке (напишите нам с этим числом).
+        e.getGuiGraphics().drawString(mc.font,
+                Component.literal("Связей рядом: " + cachedLinkLines.size()),
+                6, w < 320 ? h - 104 : h - 90, 0xFFB0E0FF, true);
     }
 
     /**

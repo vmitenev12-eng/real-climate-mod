@@ -46,6 +46,12 @@ import java.util.concurrent.ConcurrentHashMap;
  * и закрыли — прогретые стены быстро возвращают воздух почти к прежней
  * температуре, и проветривание почти незаметно.
  *
+ * Масса ведётся по ячейкам 8×8×8, но ВСЕ ячейки одной просканированной
+ * комнаты обновляются синхронно и делят одну усреднённую температуру:
+ * кондиционер греет/охлаждает комнату целиком, а не свой угол — поэтому
+ * термодатчики, пульт и HUD в любой точке комнаты сходятся, а не живут
+ * минутами в разных «погодах».
+ *
  * Переполнение скана (здание больше лимита обхода) — это НЕ улица:
  * большой торговый центр или больница остаются помещением, поэтому
  * штраф за переполнение минимальный, а герметичность не страдает вовсе.
@@ -165,39 +171,69 @@ public final class IndoorClimate {
         double leak = leakOf(scan);
         double wallFactor = 1.0 / (1.0 + scan.envelope / Math.max(30.0, scan.volume) * 0.05);
         double coupling = 0.88 * wallFactor * (1.0 - leak);
-        return thermalMass(level, origin, eq, rawAmbient, coupling, scan);
+        return thermalMass(level, eq, rawAmbient, coupling, scan);
     }
 
     /**
-     * Температура воздуха с учётом стен и обновление массы ячейки.
-     * Масса догоняет температуру воздуха, которую сама же и формирует,
-     * поэтому эффективная скорость остывания пропорциональна (1 − coupling):
-     * хорошо держащие тепло стены остывают медленнее всего. Скорость
-     * выветривания растёт с теплопроводностью ограждения и с утечками.
+     * Температура воздуха с учётом стен и обновление массы ВСЕХ ячеек
+     * комнаты разом. Усреднённая масса комнаты тянет воздух к себе
+     * (air = eq + coupling·(масса − улица)), и каждая ячейка 8×8×8
+     * догоняет этот общий воздух — поэтому у кондиционера, у датчика
+     * и под ногами игрока одна и та же температура. Масса догоняет
+     * воздух, который сама же и формирует, поэтому эффективная скорость
+     * остывания пропорциональна (1 − coupling): хорошо держащие тепло
+     * стены остывают медленнее всего. Скорость выветривания растёт
+     * с теплопроводностью ограждения и с утечками.
      */
-    private static double thermalMass(Level level, BlockPos origin, double eq, double raw,
+    private static double thermalMass(Level level, double eq, double raw,
                                       double coupling, RoomScan scan) {
         long now = level.getGameTime();
-        MassCell cell = MASS_CELLS.computeIfAbsent(
-                new MassKey(level.dimension(), origin.getX() >> 3, origin.getY() >> 3, origin.getZ() >> 3),
-                key -> new MassCell(eq, now));
-        long dt = now - cell.gameTime;
-        cell.gameTime = now;
-        double air = eq + coupling * (cell.temp - raw);
-        if (dt > 0) {
-            dt = Math.min(dt, 2400);
-            double lossRate = 0.3
-                    + Math.min(2.5, scan.envelope / Math.max(20.0, scan.volume) * 0.5)
-                    + Math.min(2.5, scan.openings * 0.3)
-                    + (scan.overflow ? 1.0 : 0.0);
-            double k = 1.0 - Math.exp(-dt * lossRate * 3.0 / 6000.0);
-            cell.temp += (air - cell.temp) * k;
+        ResourceKey<Level> dimension = level.dimension();
+
+        // Средняя температура массы по ячейкам комнаты. Ещё не тронутые
+        // ячейки в среднее не входят — свежая комната стартует с eq, скачка нет.
+        double massSum = 0.0;
+        int massCount = 0;
+        for (long packed : scan.massKeys) {
+            MassCell cell = MASS_CELLS.get(unpackCell(dimension, packed));
+            if (cell != null) {
+                massSum += cell.temp;
+                massCount++;
+            }
+        }
+        double avgMass = massCount > 0 ? massSum / massCount : eq;
+        double air = eq + coupling * (avgMass - raw);
+
+        // Все ячейки комнаты тянутся к общему воздуху с одной скоростью.
+        double lossRate = 0.3
+                + Math.min(2.5, scan.envelope / Math.max(20.0, scan.volume) * 0.5)
+                + Math.min(2.5, scan.openings * 0.3)
+                + (scan.overflow ? 1.0 : 0.0);
+        for (long packed : scan.massKeys) {
+            MassCell cell = MASS_CELLS.computeIfAbsent(
+                    unpackCell(dimension, packed), key -> new MassCell(air, now));
+            long dt = now - cell.gameTime;
+            cell.gameTime = now;
+            if (dt > 0) {
+                dt = Math.min(dt, 2400);
+                double k = 1.0 - Math.exp(-dt * lossRate * 3.0 / 6000.0);
+                cell.temp += (air - cell.temp) * k;
+            }
         }
         // Периодическая чистка старых ячеек, чтобы карта не разрасталась.
         if (MASS_CELLS.size() > 512) {
             MASS_CELLS.entrySet().removeIf(e -> now - e.getValue().gameTime > 24000);
         }
         return air;
+    }
+
+    /** Координаты ячейки 8×8×8, упакованные в long (>>3 == floorDiv для отрицательных). */
+    private static long packCell(BlockPos pos) {
+        return BlockPos.asLong(pos.getX() >> 3, pos.getY() >> 3, pos.getZ() >> 3);
+    }
+
+    private static MassKey unpackCell(ResourceKey<Level> dimension, long packed) {
+        return new MassKey(dimension, BlockPos.getX(packed), BlockPos.getY(packed), BlockPos.getZ(packed));
     }
 
     /** Текущая температура воздуха вокруг игрока (с инерцией помещения). */
@@ -246,9 +282,11 @@ public final class IndoorClimate {
         enc += (encTarget - enc) * 0.25;
         player.getPersistentData().putDouble(ENC_KEY, enc);
         // На улице воздух следует за погодой быстро, в замкнутой комнате —
-        // инерционно. У открытой двери сквозняк ускоряет обмен в обе стороны.
+        // тоже заметно (полная сходимость ~20-30 секунд): долговременную
+        // инерцию помещения теперь несёт тепловая масса стен, а не воздух
+        // игрока. У открытой двери сквозняк ускоряет обмен в обе стороны.
         double draft = draftFactor(level, pos);
-        double rate = 0.30 * (1.0 - enc) + 0.05 * enc;
+        double rate = 0.30 * (1.0 - enc) + 0.22 * enc;
         rate = Math.min(1.0, rate + draft * 0.15);
         current += (equilibrium - current) * rate;
         player.getPersistentData().putDouble(AIR_KEY, current);
@@ -257,6 +295,7 @@ public final class IndoorClimate {
     private static RoomScan scanRoom(Level level, BlockPos origin, double rawAmbient) {
         Set<Long> room = new HashSet<>();
         Set<Long> boundary = new HashSet<>();
+        Set<Long> massKeys = new HashSet<>();
         double openings = 0.0;
         double heat = 0.0;
         double envelope = 0.0;
@@ -269,6 +308,7 @@ public final class IndoorClimate {
         ArrayDeque<BlockPos> queue = new ArrayDeque<>();
         BlockPos start = origin.immutable();
         room.add(start.asLong());
+        massKeys.add(packCell(start));
         queue.add(start);
 
         while (!queue.isEmpty()) {
@@ -288,6 +328,7 @@ public final class IndoorClimate {
                     }
                     if (room.size() >= MAX_ROOM_CELLS) { overflow = true; continue; }
                     room.add(key);
+                    massKeys.add(packCell(neighbor));
                     queue.add(neighbor.immutable());
                     continue;
                 }
@@ -324,12 +365,13 @@ public final class IndoorClimate {
             }
         }
         return new RoomScan(room.size(), openings, heat, envelope,
-                acCount, acEmissionSum, grilleCount, grilleEmissionSum, overflow);
+                acCount, acEmissionSum, grilleCount, grilleEmissionSum, overflow, massKeys);
     }
 
     private record RoomScan(int volume, double openings, double heat, double envelope,
                             int acCount, double acEmissionSum,
-                            int grilleCount, double grilleEmissionSum, boolean overflow) {}
+                            int grilleCount, double grilleEmissionSum, boolean overflow,
+                            Set<Long> massKeys) {}
 
     private record MassKey(ResourceKey<Level> dimension, int x, int y, int z) {}
 

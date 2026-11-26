@@ -8,10 +8,8 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.Blocks;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.PacketFlow;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
 
 import java.util.HashSet;
@@ -37,24 +35,48 @@ public class ACOutdoorBlockEntity extends BlockEntity {
         }
     }
 
+    /** Флаг CONNECTED на блоке — визуальное подтверждение связки даже без ключа в руке. */
+    private void updateConnectedState() {
+        if (level == null || level.isClientSide) return;
+        BlockState state = getBlockState();
+        boolean shouldBeConnected = !linkedIndoors.isEmpty() || !linkedPanels.isEmpty();
+        if (state.hasProperty(ACOutdoorBlock.CONNECTED)
+                && state.getValue(ACOutdoorBlock.CONNECTED) != shouldBeConnected) {
+            level.setBlock(worldPosition, state.setValue(ACOutdoorBlock.CONNECTED, shouldBeConnected), 3);
+        }
+    }
+
     public void setLinkedIndoors(Set<BlockPos> indoors) {
         this.linkedIndoors.clear();
         this.linkedIndoors.addAll(indoors);
+        updateConnectedState();
         sync();
     }
     public Set<BlockPos> getLinkedIndoors() { return linkedIndoors; }
     public boolean linkIndoor(BlockPos pos) {
         if (linkedIndoors.size() >= 3 && !linkedIndoors.contains(pos)) return false;
         boolean changed = linkedIndoors.add(pos);
-        if (changed) sync();
+        if (changed) { updateConnectedState(); sync(); }
         return true;
     }
-    public void unlinkIndoor(BlockPos pos) { if (linkedIndoors.remove(pos)) sync(); }
-    public void unlinkAll() { if (!linkedIndoors.isEmpty()) { linkedIndoors.clear(); sync(); } }
+    public void unlinkIndoor(BlockPos pos) {
+        if (linkedIndoors.remove(pos)) { updateConnectedState(); sync(); }
+    }
+    public void unlinkAll() {
+        if (!linkedIndoors.isEmpty()) { linkedIndoors.clear(); updateConnectedState(); sync(); }
+    }
     public Set<BlockPos> getLinkedPanels() { return linkedPanels; }
-    public boolean linkPanel(BlockPos pos) { boolean changed = linkedPanels.add(pos); if (changed) sync(); return changed; }
-    public void unlinkPanel(BlockPos pos) { if (linkedPanels.remove(pos)) sync(); }
-    public void unlinkAllPanels() { if (!linkedPanels.isEmpty()) { linkedPanels.clear(); sync(); } }
+    public boolean linkPanel(BlockPos pos) {
+        boolean changed = linkedPanels.add(pos);
+        if (changed) { updateConnectedState(); sync(); }
+        return changed;
+    }
+    public void unlinkPanel(BlockPos pos) {
+        if (linkedPanels.remove(pos)) { updateConnectedState(); sync(); }
+    }
+    public void unlinkAllPanels() {
+        if (!linkedPanels.isEmpty()) { linkedPanels.clear(); updateConnectedState(); sync(); }
+    }
 
     public boolean isEnabled() { return enabled; }
     public void setEnabled(boolean e) { if (enabled != e) { enabled = e; sync(); } }

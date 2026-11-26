@@ -1,8 +1,6 @@
 package com.realclimate.climate;
 
 import net.minecraftforge.common.ForgeConfigSpec;
-import net.minecraftforge.fml.ModLoadingContext;
-import net.minecraftforge.fml.config.ModConfig;
 
 public final class ClimateConfig {
     public static final ForgeConfigSpec SPEC;
@@ -12,6 +10,7 @@ public final class ClimateConfig {
     public static final ForgeConfigSpec.BooleanValue REAL_TIME;
     public static final ForgeConfigSpec.ConfigValue<String> TIME_ANCHOR;
     public static final ForgeConfigSpec.BooleanValue SNOW_MELT;
+    public static final ForgeConfigSpec.BooleanValue WATER_FREEZE;
 
     static {
         ForgeConfigSpec.Builder builder = new ForgeConfigSpec.Builder();
@@ -26,7 +25,8 @@ public final class ClimateConfig {
                 .define("time_anchor", "spawn");
         builder.pop();
         builder.push("precipitation");
-        SNOW_MELT = builder.comment("Снег и лёд тают по температуре, скорость зависит от тепла").define("snow_melt", true);
+        SNOW_MELT = builder.comment("Снег и лёд тают по температуре с учётом источников тепла (радиатор, печка, факел)").define("snow_melt", true);
+        WATER_FREEZE = builder.comment("Вода замерзает в холоде и в помещении тоже (не только под открытым небом)").define("water_freeze", true);
         builder.pop();
         SPEC = builder.build();
         // Регистрация выполняется в RealClimate, чтобы избежать двойной регистрации

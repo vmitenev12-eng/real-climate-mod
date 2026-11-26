@@ -7,6 +7,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.LiquidBlock;
 import net.minecraft.world.level.block.SnowLayerBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraftforge.event.TickEvent;
@@ -14,15 +15,19 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
 /**
- * Снег и лёд тают по нашей температуре: выше ~0.5 °C снег начинает таять,
- * скорость растёт с температурой. Лёд требует теплее, тает медленнее,
- * снежный блок — ещё медленнее. Проверяются случайные точки вокруг игроков,
- * нагрузка минимальная.
+ * Таяние и замерзание по ФАКТИЧЕСКОЙ температуре точки: климат мира плюс
+ * локальные источники — радиатор, печка и факел греют, лёд, снег и включённый
+ * на холод кондиционер морозят. Поэтому снег тает рядом с работающим
+ * радиатором даже в уличный мороз, а вода в охлаждаемом помещении замерзает,
+ * хотя на улице плюс. Ванильная механика морозит только открытую небу
+ * поверхность — здесь проверяются случайные точки вокруг игроков независимо
+ * от неба. Нагрузка минимальная.
  */
 @Mod.EventBusSubscriber(modid = RealClimate.MODID)
 public final class SnowMeltService {
     private static final int RADIUS = 24;
     private static final int SAMPLES = 64;
+    private static final int SOURCE_RADIUS = 4;
 
     private SnowMeltService() {}
 
@@ -33,11 +38,31 @@ public final class SnowMeltService {
         if (server == null || server.getTickCount() % 40 != 0) return;
         if (!ClimateConfig.SNOW_MELT.get()) return;
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
-            meltAround(player);
+            tickAround(player);
         }
     }
 
-    private static void meltAround(ServerPlayer player) {
+    /** Климатическая температура точки плюс вклад ближних источников тепла/холода. */
+    private static double effectiveTemp(ServerLevel level, BlockPos pos) {
+        double temp = ClimateService.getTemperature(level, pos);
+        double local = 0.0;
+        BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
+        for (int dx = -SOURCE_RADIUS; dx <= SOURCE_RADIUS; dx++) {
+            for (int dy = -3; dy <= 3; dy++) {
+                for (int dz = -SOURCE_RADIUS; dz <= SOURCE_RADIUS; dz++) {
+                    if (dx == 0 && dy == 0 && dz == 0) continue;
+                    cursor.set(pos.getX() + dx, pos.getY() + dy, pos.getZ() + dz);
+                    double strength = BodyTemperature.sourceStrength(level, cursor, level.getBlockState(cursor));
+                    if (strength == 0.0) continue;
+                    int d = Math.max(Math.abs(dx), Math.max(Math.abs(dy), Math.abs(dz)));
+                    local += strength * (1.0 - d / (double) (SOURCE_RADIUS + 1));
+                }
+            }
+        }
+        return temp + Math.max(-25.0, Math.min(25.0, local));
+    }
+
+    private static void tickAround(ServerPlayer player) {
         ServerLevel level = player.serverLevel();
         RandomSource random = level.getRandom();
         BlockPos center = player.blockPosition();
@@ -49,7 +74,7 @@ public final class SnowMeltService {
             if (!level.isLoaded(pos)) continue;
             BlockState state = level.getBlockState(pos);
             if (state.isAir()) continue;
-            double temp = ClimateService.getTemperature(level, pos);
+            double temp = effectiveTemp(level, pos);
 
             if (state.is(Blocks.SNOW)) {
                 if (temp <= 0.5) continue;
@@ -71,6 +96,14 @@ public final class SnowMeltService {
                 float chance = (float) Math.min(0.5, (temp - 3.0) / 20.0);
                 if (random.nextFloat() >= chance) continue;
                 level.setBlock(pos, Blocks.WATER.defaultBlockState(), 3);
+            } else if (state.is(Blocks.WATER) && state.getValue(LiquidBlock.LEVEL) == 0) {
+                // Замерзание воды — и под открытым небом, и в помещении
+                // (например, бассейн в охлаждаемой комнате при уличном плюсе).
+                if (!ClimateConfig.WATER_FREEZE.get()) continue;
+                if (temp >= -0.5) continue;
+                float chance = (float) Math.min(1.0, (-0.5 - temp) / 12.0);
+                if (random.nextFloat() >= chance) continue;
+                level.setBlock(pos, Blocks.ICE.defaultBlockState(), 3);
             }
         }
     }

@@ -15,6 +15,10 @@ import net.minecraft.world.level.block.state.BlockState;
 /**
  * Логика термодатчика: ведёт температуру воздуха в точке установки с инерцией
  * помещения, как и у игроков (IndoorClimate), и отдаёт её пульту управления.
+ *
+ * Клиентский экран обновляется через sendBlockUpdated: при первом замере,
+ * при заметном изменении и принудительно раз в 30 с (сердцебиение) — иначе
+ * цифра на датчике навсегда оставалась той, что была при загрузке чанка.
  */
 public class ThermometerBlockEntity extends BlockEntity {
     private static final String TEMP_KEY = "AirTemp";
@@ -42,11 +46,13 @@ public class ThermometerBlockEntity extends BlockEntity {
             raw = raw * 0.4 + 6.0;
         }
         double equilibrium = IndoorClimate.roomEquilibrium(level, pos, raw);
-        if (Double.isNaN(be.airTemp)) be.airTemp = equilibrium;
+        boolean first = Double.isNaN(be.airTemp);
+        if (first) be.airTemp = equilibrium;
         double shelter = IndoorClimate.shelter(level, pos);
         double rate = 0.45 * (1.0 - shelter) + 0.07 * shelter;
         double updated = be.airTemp + (equilibrium - be.airTemp) * rate;
-        if (Math.abs(updated - be.airTemp) > 0.005) {
+        boolean heartbeat = level.getGameTime() % 600 == 0;
+        if (first || heartbeat || Math.abs(updated - be.airTemp) > 0.02) {
             be.airTemp = updated;
             be.setChanged();
             level.sendBlockUpdated(pos, state, state, 3);

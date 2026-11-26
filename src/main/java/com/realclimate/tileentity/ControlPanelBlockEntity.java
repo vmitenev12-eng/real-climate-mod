@@ -81,23 +81,29 @@ public class ControlPanelBlockEntity extends BlockEntity {
     public static void serverTick(Level level, BlockPos pos, BlockState state, ControlPanelBlockEntity be) {
         if (level.getGameTime() % 20 != 0) return;
         be.integral *= 0.98;   // затухание интегральной составляющей
-        if (!be.isAutoMode()) return;
 
-        double sum = 0.0;
-        int count = 0;
-        for (BlockPos sensorPos : be.linkedThermometers) {
-            if (!level.isLoaded(sensorPos)) continue;
-            if (level.getBlockEntity(sensorPos) instanceof ThermometerBlockEntity thermometer) {
-                sum += thermometer.getMeasured();
-                count++;
+        // Замер обновляем всегда, пока привязан хоть один датчик:
+        // экран пульта обязан жить и в ручном режиме, а не только в авторежиме.
+        double measured = Double.NaN;
+        if (!be.linkedThermometers.isEmpty()) {
+            double sum = 0.0;
+            int count = 0;
+            for (BlockPos sensorPos : be.linkedThermometers) {
+                if (!level.isLoaded(sensorPos)) continue;
+                if (level.getBlockEntity(sensorPos) instanceof ThermometerBlockEntity thermometer) {
+                    sum += thermometer.getMeasured();
+                    count++;
+                }
             }
+            if (count > 0) measured = sum / count;
         }
-        if (count == 0) return;
-        double measured = sum / count;
-        if (Double.isNaN(be.lastMeasured) || Math.abs(be.lastMeasured - measured) > 0.05) {
+        if (!Double.isNaN(measured)
+                && (Double.isNaN(be.lastMeasured) || Math.abs(be.lastMeasured - measured) > 0.05)) {
             be.lastMeasured = measured;
             be.sync();
         }
+
+        if (!be.isAutoMode() || Double.isNaN(measured)) return;
 
         // ПИ-регулятор: error > 0 — в помещении холоднее уставки, греем сильнее.
         double error = be.targetTemp - measured;

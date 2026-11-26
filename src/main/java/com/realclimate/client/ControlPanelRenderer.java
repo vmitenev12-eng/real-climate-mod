@@ -14,8 +14,8 @@ import org.joml.Quaternionf;
 
 /**
  * Экран настенного пульта: крупно — заданная температура, ниже мелко —
- * фактическая (в авторежиме по привязанным термодатчикам). Текст рисуется
- * на лицевой стороне пульта (кнопки выступают на 12/16 блока).
+ * фактическая (по привязанным термодатчикам, в любом режиме, не только в авто).
+ * Текст рисуется на лицевой стороне пульта (кнопки выступают на 12/16 блока).
  */
 public class ControlPanelRenderer implements BlockEntityRenderer<ControlPanelBlockEntity> {
     private final Font font;
@@ -62,8 +62,8 @@ public class ControlPanelRenderer implements BlockEntityRenderer<ControlPanelBlo
                 false, pose.last().pose(), buffer, Font.DisplayMode.POLYGON_OFFSET,
                 0, packedLight);
 
-        // В авторежиме под уставкой показываем фактическую температуру.
-        if (measText != null && panel.isAutoMode()) {
+        // Под уставкой показываем фактическую температуру, если есть датчики.
+        if (measText != null && !panel.getLinkedThermometers().isEmpty()) {
             float mw = font.width(measText);
             font.drawInBatch(Component.literal(measText), -mw / 2.0f, 9.0f, 0xFF8CE99C,
                     false, pose.last().pose(), buffer, Font.DisplayMode.POLYGON_OFFSET,

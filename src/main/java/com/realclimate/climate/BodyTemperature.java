@@ -82,14 +82,14 @@ public final class BodyTemperature {
     }
 
     /**
-     * Обновление влаги: в воде мокнешь мгновенно, под дождём — примерно за
-     * минуту, сохнешь ~45 с. Вызывается раз в PERIOD тиков на сервере.
+     * Обновление влаги: в воде мокнешь мгновенно, под открытым дождём — примерно
+     * за минуту (крыша спасает), сохнешь ~45 с. Раз в PERIOD тиков на сервере.
      */
     private static void updateWetness(ServerPlayer p) {
         double wet = wetness(p);
         if (p.isInWater()) {
             wet = 1.0;
-        } else if (p.isInRain()) {
+        } else if (p.level().isRainingAt(p.blockPosition())) {
             wet = Math.min(1.0, wet + (double) PERIOD / 2400.0);
         } else if (wet > 0.0) {
             wet = Math.max(0.0, wet - (double) PERIOD / 1800.0);

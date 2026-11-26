@@ -23,6 +23,12 @@ import java.util.Set;
  * двери плавные: воздух «сохраняется» и постепенно смешивается с уличным,
  * а у открытой двери возникает сквозняк.
  *
+ * Приточные устройства (внутренние блоки сплит-систем, решётки вентиляции)
+ * учитываются отдельно от пассивных источников: вентилятор перемешивает
+ * весь объём комнаты, поэтому их струя не размазывается по объёму. Каждое
+ * такое устройство — термостат: оно само докручивает температуру струи,
+ * пока комната не выйдет на уставку.
+ *
  * Ограждающие конструкции учитываются по-настоящему: каждая граница комнаты
  * вносит теплопроводность area·λ/толщина (ThermalProperties), поэтому
  * деревянная бытовка держит тепло, каменный дом — плохо, тонкая стенка
@@ -72,10 +78,10 @@ public final class IndoorClimate {
 
     /**
      * Равновесная температура воздуха в помещении вокруг точки. Учитывает
-     * источники тепла, подключённые вентиляционные решётки, утечки наружу и
-     * теплопроводность ограждающих конструкций (стены, окна, тонкие стенки
-     * из миниблоков). Если объём не замкнут — равновесие стремится к уличной
-     * температуре.
+     * источники тепла, внутренние блоки сплит-систем, подключённые
+     * вентиляционные решётки, утечки наружу и теплопроводность ограждающих
+     * конструкций (стены, окна, тонкие стенки из миниблоков). Если объём не
+     * замкнут — равновесие стремится к уличной температуре.
      */
     public static double roomEquilibrium(Level level, BlockPos origin, double rawAmbient) {
         RoomScan scan = scanRoom(level, origin, rawAmbient);
@@ -85,16 +91,29 @@ public final class IndoorClimate {
 
     private static double equilibrium(RoomScan scan, double rawAmbient) {
         double spread = 1.0 + Math.sqrt(scan.volume) / 8.0;
-        double leak = Math.min(1.0, scan.openings * 0.25 + (scan.overflow ? 0.5 : 0.0));
-        // Каждая решётка тянет воздух к температуре своей системы, но мощность
-        // системы делится между всеми её решётками: (flow - raw) / systemSize.
-        // Несколько решёток в одной системе не складывают температуру.
-        double grilleSaturation = scan.grilleCount <= 1 ? 0.6 : Math.min(1.0, 0.6 + 0.2 * (scan.grilleCount - 1));
-        double grilleTerm = scan.grilleTempSum * grilleSaturation;
+        // Утечка нормируется на размер комнаты: открытая дверь в большом зале
+        // сквозит и тянет тепло, но не превращает весь объём в улицу.
+        double norm = Math.max(5.0, scan.volume * 0.04);
+        double leak = Math.min(1.0, scan.openings / norm * 1.2 + (scan.overflow ? 0.5 : 0.0));
         // Ограждающие конструкции: envelope = Σ (площадь × λ / толщина).
         // Большой envelope — тонкие/металлические/стеклянные стены, тепло уходит.
         double envelopeDamping = 1.0 / (1.0 + scan.envelope * 0.12);
-        return rawAmbient + (scan.heat / spread + grilleTerm) * (1.0 - leak) * envelopeDamping;
+        // Пассивные источники (радиаторы, печи, факелы, лёд): тепло разлетается
+        // по объёму и вымывается утечками и теплопроводностью стен.
+        double passive = (scan.heat / spread) * (1.0 - leak) * envelopeDamping;
+        // Приток от вентиляторов: струя перемешивает всю комнату и не делится
+        // на объём. Несколько устройств не суммируют мощность — берётся средняя
+        // температура струи, а охват растёт с их числом. Утечки струю смывают.
+        double forced = 0.0;
+        if (scan.acCount > 0) {
+            double coupling = Math.min(0.95, 0.75 + 0.10 * (scan.acCount - 1));
+            forced += (scan.acEmissionSum / scan.acCount - rawAmbient) * coupling;
+        }
+        if (scan.grilleCount > 0) {
+            double coupling = Math.min(0.9, 0.65 + 0.15 * (scan.grilleCount - 1));
+            forced += (scan.grilleEmissionSum / scan.grilleCount - rawAmbient) * coupling;
+        }
+        return rawAmbient + passive + forced * (1.0 - leak);
     }
 
     /** Текущая температура воздуха вокруг игрока (с инерцией помещения). */
@@ -128,21 +147,23 @@ public final class IndoorClimate {
         }
         double current = getAir(player);
         if (Double.isNaN(current)) current = raw;
-        double shelter = shelter(level, pos);
         RoomScan scan = scanRoom(level, pos, raw);
         double equilibrium = scan == null ? raw : equilibrium(scan, raw);
         // Герметичность по скану объёма: 0 — открыто наружу, 1 — замкнутая
-        // комната. Сглаживаем, чтобы у проёма не было мгновенных переключений.
+        // комната. Нормировка на размер комнаты: одна открытая дверь не
+        // превращает большой зал в «улицу». Сглаживаем, чтобы у проёма
+        // не было мгновенных переключений.
         double encTarget = scan == null ? 0.0
-                : 1.0 - Math.min(1.0, scan.openings * 0.25 + (scan.overflow ? 0.5 : 0.0));
+                : 1.0 - Math.min(1.0, scan.openings / Math.max(5.0, scan.volume * 0.04)
+                        + (scan.overflow ? 0.5 : 0.0));
         double enc = enclosure(player);
         if (Double.isNaN(enc)) enc = encTarget;
         enc += (encTarget - enc) * 0.25;
         player.getPersistentData().putDouble(ENC_KEY, enc);
-        // На улице воздух меняется быстро, в помещении — инерционно.
-        // У открытой двери сквозняк ускоряет обмен в обе стороны.
+        // На улице воздух следует за погодой быстро, в замкнутой комнате —
+        // инерционно. У открытой двери сквозняк ускоряет обмен в обе стороны.
         double draft = draftFactor(level, pos);
-        double rate = 0.30 * (1.0 - shelter) + 0.04 * shelter;
+        double rate = 0.30 * (1.0 - enc) + 0.05 * enc;
         rate = Math.min(1.0, rate + draft * 0.15);
         current += (equilibrium - current) * rate;
         player.getPersistentData().putDouble(AIR_KEY, current);
@@ -154,8 +175,10 @@ public final class IndoorClimate {
         double openings = 0.0;
         double heat = 0.0;
         double envelope = 0.0;
+        int acCount = 0;
+        double acEmissionSum = 0.0;
         int grilleCount = 0;
-        double grilleTempSum = 0.0;
+        double grilleEmissionSum = 0.0;
         boolean overflow = false;
 
         ArrayDeque<BlockPos> queue = new ArrayDeque<>();
@@ -187,23 +210,39 @@ public final class IndoorClimate {
                 if (MiniBlockIntegration.allowsAirPassage(level, neighbor, direction)) {
                     openings += MiniBlockIntegration.openGapRatio(level, neighbor, direction);
                 }
-                heat += BodyTemperature.sourceStrength(level, neighbor, state);
-                // Теплопроводность ограждения: тонкая стенка из миниблоков
-                // пропускает тепло пропорционально своей толщине.
-                envelope += ThermalProperties.faceConductance(level, neighbor, direction);
-                if (state.getBlock() instanceof com.realclimate.block.GrilleBlock
+                // Приточные устройства — отдельными термами (их струя
+                // перемешивает комнату и не делится на объём), чтобы не
+                // дублировать их вклад в пассивном тепле.
+                if (state.getBlock() instanceof com.realclimate.block.ACIndoorBlock
+                        && state.hasProperty(com.realclimate.block.ACIndoorBlock.ACTIVE)
+                        && state.getValue(com.realclimate.block.ACIndoorBlock.ACTIVE)
+                        && level.getBlockEntity(neighbor) instanceof com.realclimate.tileentity.ACIndoorBlockEntity ac
+                        && ac.isEnabled()) {
+                    acCount++;
+                    double emission = ac.getEmission();
+                    acEmissionSum += Double.isNaN(emission) ? ac.getTargetTemp() : emission;
+                } else if (state.getBlock() instanceof com.realclimate.block.GrilleBlock
                         && level.getBlockEntity(neighbor) instanceof com.realclimate.tileentity.GrilleBlockEntity grille
                         && grille.isOpen() && VentilationService.hasActiveAirflow(level, neighbor)) {
                     grilleCount++;
-                    double flow = VentilationService.airflowTemperature(level, neighbor, grille.getTargetTemp());
-                    int systemSize = VentilationService.grilleSystemSize(level, neighbor);
-                    grilleTempSum += (flow - rawAmbient) / systemSize;
+                    double emission = grille.getEmission();
+                    if (Double.isNaN(emission)) {
+                        emission = VentilationService.airflowTemperature(level, neighbor, grille.getTargetTemp());
+                    }
+                    grilleEmissionSum += emission;
+                } else {
+                    heat += BodyTemperature.sourceStrength(level, neighbor, state);
                 }
+                // Теплопроводность ограждения: тонкая стенка из миниблоков
+                // пропускает тепло пропорционально своей толщине.
+                envelope += ThermalProperties.faceConductance(level, neighbor, direction);
             }
         }
-        return new RoomScan(room.size(), openings, heat, envelope, grilleCount, grilleTempSum, overflow);
+        return new RoomScan(room.size(), openings, heat, envelope,
+                acCount, acEmissionSum, grilleCount, grilleEmissionSum, overflow);
     }
 
     private record RoomScan(int volume, double openings, double heat, double envelope,
-                            int grilleCount, double grilleTempSum, boolean overflow) {}
+                            int acCount, double acEmissionSum,
+                            int grilleCount, double grilleEmissionSum, boolean overflow) {}
 }

@@ -2,10 +2,19 @@ package com.realclimate.climate;
 
 import com.mojang.brigadier.context.CommandContext;
 import com.realclimate.RealClimate;
+import com.realclimate.block.ACIndoorBlock;
+import com.realclimate.tileentity.ACIndoorBlockEntity;
+import com.realclimate.tileentity.ACOutdoorBlockEntity;
+import com.realclimate.tileentity.ControlPanelBlockEntity;
+import com.realclimate.tileentity.GrilleBlockEntity;
+import com.realclimate.tileentity.RadiatorBlockEntity;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
+import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.event.AddReloadListenerEvent;
 import net.minecraftforge.event.RegisterCommandsEvent;
@@ -43,6 +52,7 @@ public final class ClimateEvents {
         e.getDispatcher().register(Commands.literal("climate")
                 .executes(ClimateEvents::info)
                 .then(Commands.literal("body").executes(ClimateEvents::body))
+                .then(Commands.literal("room").executes(ClimateEvents::room))
                 .then(Commands.literal("time").executes(ClimateEvents::time)));
     }
 
@@ -63,8 +73,68 @@ public final class ClimateEvents {
             src.sendFailure(Component.literal("Команда доступна только игроку."));
             return 0;
         }
-        String text = String.format("Тело: %.1f °C | воздух вокруг: %.1f °C | утепление: %.0f%%",
-                BodyTemperature.get(p), BodyTemperature.effectiveAmbient(p), BodyTemperature.insulation(p) * 100);
+        double raw = ClimateService.temperature(p.getX(), p.getZ(), p.getY());
+        double eq = IndoorClimate.roomEquilibrium(p.level(), p.blockPosition(), raw);
+        double air = IndoorClimate.getAir(p);
+        double enc = IndoorClimate.enclosure(p);
+        String text = String.format(
+                "Тело: %.1f °C | воздух вокруг: %.1f °C | утепление: %.0f%%%n"
+                        + "Комната: равновесие %.1f °C | масса воздуха %.1f °C | герметичность %.0f%%",
+                BodyTemperature.get(p), BodyTemperature.effectiveAmbient(p), BodyTemperature.insulation(p) * 100,
+                eq, Double.isNaN(air) ? raw : air, (Double.isNaN(enc) ? 0.0 : enc) * 100);
+        src.sendSuccess(() -> Component.literal(text), false);
+        return 1;
+    }
+
+    /**
+     * Диагностика микроклимата: показывает все климатические приборы в радиусе
+     * 9 блоков с их уставками, струёй и состоянием связок. Если заданная
+     * температура «игнорируется» — по этому выводу видно, где порвалась
+     * цепочка пульт→наружный→внутренний/решётка.
+     */
+    private static int room(CommandContext<CommandSourceStack> ctx) {
+        CommandSourceStack src = ctx.getSource();
+        if (!(src.getEntity() instanceof ServerPlayer p)) {
+            src.sendFailure(Component.literal("Команда доступна только игроку."));
+            return 0;
+        }
+        Level lv = p.level();
+        BlockPos center = p.blockPosition();
+        StringBuilder sb = new StringBuilder();
+        for (BlockPos pos : BlockPos.betweenClosed(center.offset(-9, -5, -9), center.offset(9, 5, 9))) {
+            BlockEntity be = lv.getBlockEntity(pos);
+            if (be instanceof ACIndoorBlockEntity in) {
+                boolean active = lv.getBlockState(pos).hasProperty(ACIndoorBlock.ACTIVE)
+                        && lv.getBlockState(pos).getValue(ACIndoorBlock.ACTIVE);
+                sb.append(String.format("Внутренний блок [%d %d %d]: уставка %.1f°, струя %.1f°, %s, наружный %s%n",
+                        pos.getX(), pos.getY(), pos.getZ(), in.getTargetTemp(),
+                        Double.isNaN(in.getEmission()) ? in.getTargetTemp() : in.getEmission(),
+                        active ? "ДУЕТ" : "пауза",
+                        in.getLinkedOutdoor() != null ? "привязан" : "НЕ ПРИВЯЗАН"));
+            } else if (be instanceof ACOutdoorBlockEntity out) {
+                sb.append(String.format("Наружный блок [%d %d %d]: рабочая уставка %.1f°, внутренних %d, пультов %d, %s%n",
+                        pos.getX(), pos.getY(), pos.getZ(), out.getOperatingTargetTemp(lv),
+                        out.getLinkedIndoors().size(), out.getLinkedPanels().size(),
+                        out.isEnabled() ? "включён" : "ВЫКЛЮЧЕН"));
+            } else if (be instanceof ControlPanelBlockEntity cp) {
+                sb.append(String.format("Пульт [%d %d %d]: уставка %.1f°, режим %s, замер %s, наружных %d, датчиков %d%n",
+                        pos.getX(), pos.getY(), pos.getZ(), cp.getTargetTemp(),
+                        cp.isAutoMode() ? "авто" : "ручной",
+                        Double.isNaN(cp.getLastMeasured()) ? "—" : String.format("%.1f°", cp.getLastMeasured()),
+                        cp.getLinkedOutdoors().size(), cp.getLinkedThermometers().size()));
+            } else if (be instanceof GrilleBlockEntity g) {
+                sb.append(String.format("Решётка [%d %d %d]: уставка %.1f°, поток %s, %s%n",
+                        pos.getX(), pos.getY(), pos.getZ(), g.getTargetTemp(),
+                        Double.isNaN(g.getEmission()) ? "—" : String.format("%.1f°", g.getEmission()),
+                        g.isOpen() ? "открыта" : "закрыта"));
+            } else if (be instanceof RadiatorBlockEntity r) {
+                sb.append(String.format("Радиатор [%d %d %d]: уставка %.1f°, %s%n",
+                        pos.getX(), pos.getY(), pos.getZ(), r.getTargetTemp(),
+                        r.isEnabled() ? "включён" : "выключен"));
+            }
+        }
+        if (sb.length() == 0) sb.append("Приборов в радиусе 9 блоков не найдено.");
+        String text = sb.toString().trim();
         src.sendSuccess(() -> Component.literal(text), false);
         return 1;
     }

@@ -97,9 +97,9 @@ public final class RealTimeService {
     private static double anchorWorldX() {
         String anchor = ClimateConfig.TIME_ANCHOR.get();
         try {
-            // Якорь задан числом — трактуем как долготу напрямую.
+            // Якорь задан числом — трактуем как долготу напрямую (с учётом начала координат).
             double lon = Math.max(-180.0, Math.min(180.0, Double.parseDouble(anchor)));
-            return lon * Geo.METERS_PER_DEGREE / ClimateConfig.scale();
+            return Geo.xForLongitude(lon, ClimateConfig.scale());
         } catch (NumberFormatException ignored) {
             // По умолчанию — долгота точки спавна.
         }

@@ -187,10 +187,11 @@ public final class IndoorClimate {
         RoomScan scan = findRoom(level, pos);
         if (scan == null) return "комната не найдена";
         DeviceTerms dev = resolveDevices(level, scan);
-        return String.format("объём %d | кондиционеров %d/%d | решёток %d/%d | утечки %.1f (небо %.1f, щели %.1f) | ограждение %.1f | переполнение %s",
+        return String.format("объём %d | кондиционеров %d/%d | решёток %d/%d | утечки %.1f (небо %.1f, щели %.1f) | ограждение %.1f | переполнение %s | на границе: %s",
                 scan.volume, dev.acCount, scan.acPositions.size(), dev.grilleCount, scan.grillePositions.size(),
                 scan.openings, scan.skyOpenings, scan.openings - scan.skyOpenings, scan.envelope,
-                scan.overflow ? "ДА" : "нет");
+                scan.overflow ? "ДА" : "нет",
+                scan.boundaryDevices.isEmpty() ? "ничего" : scan.boundaryDevices);
     }
 
     /**
@@ -522,6 +523,7 @@ public final class IndoorClimate {
         double heat = 0.0;
         double envelope = 0.0;
         boolean overflow = false;
+        Map<String, Integer> boundaryBlocks = new HashMap<>();
 
         ArrayDeque<BlockPos> queue = new ArrayDeque<>();
         BlockPos start = origin.immutable();
@@ -552,6 +554,13 @@ public final class IndoorClimate {
                     continue;
                 }
                 boundary.add(key);
+                // Диагностика: какие блоки мода вообще касаются комнаты
+                // (видно в /climate body — «на границе: …»).
+                net.minecraft.resources.ResourceLocation bid =
+                        net.minecraftforge.registries.ForgeRegistries.BLOCKS.getKey(state.getBlock());
+                if (bid != null && bid.getNamespace().equals("real_climate")) {
+                    boundaryBlocks.merge(bid.getPath(), 1, Integer::sum);
+                }
                 // Дующая приточная решётка — не дыра на улицу: магистраль нагнетает
                 // воздух В комнату, её вклад уже учтён термом струи. А вот решётка
                 // без потока (система выключена) — честная щель в воздуховод.
@@ -583,13 +592,21 @@ public final class IndoorClimate {
                 envelope += ThermalProperties.faceConductance(level, neighbor, direction);
             }
         }
+        StringBuilder devices = new StringBuilder();
+        boundaryBlocks.entrySet().stream()
+                .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
+                .forEach(e -> {
+                    if (devices.length() > 0) devices.append(", ");
+                    devices.append(e.getKey()).append("×").append(e.getValue());
+                });
         return new RoomScan(room.size(), openings, skyOpenings, heat, envelope, overflow,
-                room, massKeys, acPositions, grillePositions);
+                room, massKeys, acPositions, grillePositions, devices.toString());
     }
 
     private record RoomScan(int volume, double openings, double skyOpenings, double heat, double envelope,
                             boolean overflow, Set<Long> room, Set<Long> massKeys,
-                            List<BlockPos> acPositions, List<BlockPos> grillePositions) {}
+                            List<BlockPos> acPositions, List<BlockPos> grillePositions,
+                            String boundaryDevices) {}
 
     private record DeviceTerms(int acCount, double acEmissionSum,
                                int grilleCount, double grilleEmissionSum) {}
@@ -609,6 +626,7 @@ public final class IndoorClimate {
         final boolean overflow;
         final List<BlockPos> acPositions;
         final List<BlockPos> grillePositions;
+        final String boundaryDevices;
         final long gameTime;
         final AtomicBoolean invalidated = new AtomicBoolean();
 
@@ -622,12 +640,13 @@ public final class IndoorClimate {
             this.overflow = scan.overflow;
             this.acPositions = scan.acPositions;
             this.grillePositions = scan.grillePositions;
+            this.boundaryDevices = scan.boundaryDevices;
             this.gameTime = gameTime;
         }
 
         RoomScan toScan() {
             return new RoomScan(room.size(), openings, skyOpenings, heat, envelope, overflow,
-                    room, massKeys, acPositions, grillePositions);
+                    room, massKeys, acPositions, grillePositions, boundaryDevices);
         }
     }
 

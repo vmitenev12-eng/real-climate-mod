@@ -19,7 +19,7 @@ public class RealClimate {
     public static final String MODID = "real_climate";
     /** Дублирует version из build.gradle — печатается в /climate body, чтобы по скриншоту
      * было видно, какая сборка реально стоит на сервере. При бампе версии менять вместе. */
-    public static final String MOD_VERSION = "0.1.24";
+    public static final String MOD_VERSION = "0.1.25";
 
     public RealClimate() {
         IEventBus bus = FMLJavaModLoadingContext.get().getModEventBus();

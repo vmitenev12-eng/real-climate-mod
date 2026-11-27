@@ -19,7 +19,7 @@ public class RealClimate {
     public static final String MODID = "real_climate";
     /** Дублирует version из build.gradle — печатается в /climate body, чтобы по скриншоту
      * было видно, какая сборка реально стоит на сервере. При бампе версии менять вместе. */
-    public static final String MOD_VERSION = "0.1.29";
+    public static final String MOD_VERSION = "0.1.30";
 
     public RealClimate() {
         IEventBus bus = FMLJavaModLoadingContext.get().getModEventBus();
@@ -34,7 +34,8 @@ public class RealClimate {
 
         ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, ClimateConfig.SPEC);
 
-        // Миксины: тип осадков решает климат мода, а не шаблон биома.
+        // Миксины: тип осадков решает климат мода, а не шаблон биома; свет,
+        // спавн и горение нежити живут по местному солнцу точки.
         Mixins.addConfiguration("real_climate.mixins.json");
 
         // Клиентские события регистрируются через @Mod.EventBusSubscriber аннотации

@@ -5,7 +5,9 @@
   "compatibilityLevel": "JAVA_17",
   "refmap": "real_climate.refmap.json",
   "mixins": [
-    "MixinBiome"
+    "MixinBiome",
+    "MixinLevelReader",
+    "MixinMobSun"
   ],
   "client": [],
   "injectors": {

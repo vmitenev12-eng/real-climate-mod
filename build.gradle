@@ -15,7 +15,7 @@ plugins {
 }
 apply plugin: 'org.spongepowered.mixin'
 
-version = '0.1.29'
+version = '0.1.30'
 group = 'com.realclimate'
 base { archivesName = 'real_climate-1.20.1-forge' }
 
@@ -41,8 +41,9 @@ sourceSets.main.resources { srcDir 'src/generated/resources' }
 dependencies {
     minecraft 'net.minecraftforge:forge:1.20.1-47.4.2'
 
-    // Миксины (осадки по реальной температуре): процессор аннотаций для refmap
-    // и библиотека в compile- и runtime-classpath. Без внешних зависимостей у самого мода.
+    // Миксины (осадки по реальной температуре, местное солнце в логике):
+    // процессор аннотаций для refmap и библиотека в compile- и runtime-classpath.
+    // Без внешних зависимостей у самого мода.
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
     implementation 'org.spongepowered:mixin:0.8.5'
     minecraftLibrary 'org.spongepowered:mixin:0.8.5'

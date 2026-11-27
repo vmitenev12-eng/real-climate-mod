@@ -13,14 +13,17 @@ import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.event.AddReloadListenerEvent;
+import net.minecraftforge.event.entity.player.SleepingTimeCheckEvent;
 import net.minecraftforge.event.level.BlockEvent;
 import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.event.server.ServerStartingEvent;
 import net.minecraftforge.event.server.ServerStoppedEvent;
+import net.minecraftforge.eventbus.api.Event;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
@@ -65,6 +68,23 @@ public final class ClimateEvents {
         if (!(e.getLevel() instanceof Level level)) return;
         if (e.getState().getBlock() instanceof ACIndoorBlock) return;
         IndoorClimate.invalidateRoomAt(level, e.getPos());
+    }
+
+    /**
+     * Сон — по местной ночи в точке кровати, а не по мировому времени якоря:
+     * в городе на часовом поясе +12 ложатся в его ночь, а в его полдень
+     * кровать честно отвечает «сейчас нельзя». Событие Forge срабатывает и
+     * при укладывании, и при проверке продолжения сна.
+     */
+    @SubscribeEvent
+    public static void onSleepTimeCheck(SleepingTimeCheckEvent e) {
+        if (!RealTimeService.isRealTime()) return;
+        Player player = e.getEntity();
+        if (player.level().dimension() != Level.OVERWORLD) return;
+        BlockPos pos = e.getSleepingLocation().orElse(player.blockPosition());
+        double lat = Geo.latitude(pos.getZ(), ClimateConfig.scale());
+        double lon = Geo.longitude(pos.getX(), ClimateConfig.scale());
+        e.setResult(SolarService.isDayAt(lat, lon) ? Event.Result.DENY : Event.Result.ALLOW);
     }
 
     @SubscribeEvent

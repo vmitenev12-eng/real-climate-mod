@@ -126,4 +126,20 @@ public final class SolarService {
         }
         return Math.floorMod((long) Math.round(ticks), 24000L);
     }
+
+    /** День ли сейчас в точке: местное время между восходом и закатом
+     * (небесные тики 0..12000 — день). Полярный день — всегда день,
+     * полярная ночь — всегда ночь. */
+    public static boolean isDayAt(double lat, double lon) {
+        return skyTicks(lat, lon) < 12000L;
+    }
+
+    /** «Затемнение неба» в точке в шкале ванильного getSkyDarken: 0 — ясный
+     * полдень, 11 — глубокая ночь. Считается от местной силы солнца с той же
+     * поправкой на дождь и грозу, что и у ванили (минус 5/16 за каждый). */
+    public static int skyDarkenAt(double lat, double lon, float rainLevel, float thunderLevel) {
+        double weather = (1.0 - rainLevel * 5.0 / 16.0) * (1.0 - thunderLevel * 5.0 / 16.0);
+        double brightness = Math.max(0.0, Math.min(1.0, sunFactor(lat, lon) * weather));
+        return (int) Math.round(11.0 * (1.0 - brightness));
+    }
 }

@@ -17,6 +17,7 @@ import net.minecraftforge.fml.common.Mod;
  * плюс смещение из долготы (15° = 1 час, как в природе). Какая долгота задаёт
  * мировое время — настраивается: спавн мира или фиксированное число.
  * Часовой пояс любой точки мира = её долгота / 15.
+ * Так же ведёт глобальные осадки мира по живой погоде якорной точки.
  */
 @Mod.EventBusSubscriber(modid = RealClimate.MODID)
 public final class RealTimeService {
@@ -101,12 +102,33 @@ public final class RealTimeService {
         // для его широты/долготы (SolarService растягивает световой день на
         // 0..12000 тиков, ночь — на 12000..24000). Пакет уходит после ванильной
         // рассылки мирового времени в этом же тике, поэтому побеждает наш.
-        // Мировое время (логика жителей, графики) по-прежнему ведёт якорь.
+        // Мировое время по-прежнему ведёт якорь (его слышат расписания жителей
+        // и прочая якорная логика), а освещённость, спавн, горение нежити и сон
+        // уже считаются по местному солнцу точки (MixinLevelReader и др.).
         for (ServerPlayer p : server.getPlayerList().getPlayers()) {
             double lat = Geo.latitude(p.getZ(), ClimateConfig.scale());
             double lon = Geo.longitude(p.getX(), ClimateConfig.scale());
             p.connection.send(new ClientboundSetTimePacket(
                     p.level().getGameTime(), SolarService.skyTicks(lat, lon), false));
+        }
+
+        // Глобальные дождь и гроза следуют живой погоде якорной точки: осадки в
+        // ванили общие на всё измерение, поэтому за образец берём город-якорь.
+        // Раз в 5 секунд; без сети (или online_weather=false) погоду не трогаем.
+        if (overworld != null && server.getTickCount() % 100 == 0) {
+            double aLat = Geo.latitude(overworld.getSharedSpawnPos().getZ(), ClimateConfig.scale());
+            double aLon = Double.isNaN(anchorLongitude) ? resolveAnchor() : anchorLongitude;
+            Integer code = WeatherService.weatherCode(aLat, aLon);
+            if (code != null) {
+                boolean wantRain = code >= 95 || (code >= 51 && code <= 67)
+                        || (code >= 71 && code <= 77) || (code >= 80 && code <= 82)
+                        || (code >= 85 && code <= 86);
+                boolean wantThunder = code >= 95;
+                if (wantRain != overworld.isRaining() || wantThunder != overworld.isThundering()) {
+                    overworld.setWeatherParameters(wantRain ? 0 : 6000, wantRain ? 6000 : 0,
+                            wantRain, wantThunder);
+                }
+            }
         }
     }
 

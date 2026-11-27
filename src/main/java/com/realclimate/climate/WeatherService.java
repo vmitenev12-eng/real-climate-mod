@@ -18,12 +18,13 @@ import java.util.concurrent.Executors;
 
 /**
  * Живая погода из интернета (Open-Meteo, ключ не нужен): реальная температура,
- * почасовой прогноз, настоящий часовой пояс и точные восход/закат для клетки
- * 0.5°×0.5° вокруг точки мира. Запросы идут в фоновом потоке и кэшируются на
- * 30 минут — тик сервера никогда не ждёт сеть. Пока данных нет или интернет
- * недоступен, все обращения возвращают null/нет, и вызывающие места молча
- * работают на автономной климатической модели. Отключается конфигом
- * online_weather (например, у владельца сервера нет выхода в сеть).
+ * почасовой прогноз, настоящий часовой пояс, точные восход/закат и текущий
+ * WMO-код погоды (дождь/снег/гроза) для клетки 0.5°×0.5° вокруг точки мира.
+ * Запросы идут в фоновом потоке и кэшируются на 30 минут — тик сервера никогда
+ * не ждёт сеть. Пока данных нет или интернет недоступен, все обращения
+ * возвращают null/нет, и вызывающие места молча работают на автономной
+ * климатической модели. Отключается конфигом online_weather (например, у
+ * владельца сервера нет выхода в сеть).
  */
 public final class WeatherService {
     private static final long TTL_MS = 30L * 60_000L;
@@ -47,6 +48,8 @@ public final class WeatherService {
         volatile int utcOffsetSec = Integer.MIN_VALUE;
         volatile double sunriseHour = Double.NaN; // местный час сегодня
         volatile double sunsetHour = Double.NaN;
+        /** Текущий WMO-код погоды (0 — ясно, 61 — дождь, 71 — снег, 95 — гроза), -1 — нет данных. */
+        volatile int weatherCode = -1;
         Entry(double lat, double lon) { this.lat = lat; this.lon = lon; }
     }
 
@@ -80,7 +83,8 @@ public final class WeatherService {
             }
             String url = String.format(Locale.ROOT,
                     "https://api.open-meteo.com/v1/forecast?latitude=%.2f&longitude=%.2f"
-                            + "&hourly=temperature_2m&daily=sunrise,sunset&timezone=auto&forecast_days=2",
+                            + "&hourly=temperature_2m&daily=sunrise,sunset&current_weather=true"
+                            + "&timezone=auto&forecast_days=2",
                     e.lat, e.lon);
             HttpRequest req = HttpRequest.newBuilder(URI.create(url))
                     .timeout(Duration.ofSeconds(10)).build();
@@ -101,6 +105,12 @@ public final class WeatherService {
             JsonObject daily = root.getAsJsonObject("daily");
             e.sunriseHour = hm(daily.getAsJsonArray("sunrise").get(0).getAsString());
             e.sunsetHour = hm(daily.getAsJsonArray("sunset").get(0).getAsString());
+            if (root.has("current_weather") && root.get("current_weather").isJsonObject()) {
+                JsonObject current = root.getAsJsonObject("current_weather");
+                if (current.has("weathercode") && !current.get("weathercode").isJsonNull()) {
+                    e.weatherCode = current.get("weathercode").getAsInt();
+                }
+            }
             e.fetchedAt = System.currentTimeMillis();
         } catch (Throwable t) {
             // Офлайн или API недоступен: тихо остаёмся на модели, повтор через минуту.
@@ -160,6 +170,13 @@ public final class WeatherService {
         Entry e = entry(lat, lon);
         if (Double.isNaN(e.sunriseHour)) return null;
         return new double[]{e.sunriseHour, e.sunsetHour};
+    }
+
+    /** Текущий WMO-код погоды точки (0 — ясно, 61 — дождь, 71 — снег,
+     * 95 — гроза); null — данных нет (офлайн или первая загрузка). */
+    public static Integer weatherCode(double lat, double lon) {
+        Entry e = entry(lat, lon);
+        return e.weatherCode < 0 ? null : e.weatherCode;
     }
 
     /** Есть ли свежие данные из сети для точки (пометка в /climate). */

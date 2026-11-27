@@ -165,9 +165,10 @@ public final class ClimateEvents {
         double scale = ClimateService.scale();
         double lat = Geo.latitude(p.z, scale);
         double lon = Geo.longitude(p.x, scale);
-        int band = Geo.band(lat);
-        double now = ClimateService.temperature(p.x, p.z, scale);
-        Forecast f = ClimateService.forecast(band);
+        // Прогноз считаем от реальной широты: Geo.band отдавал floor(широты)
+        // в таблицу зон 0..3, и любой настоящий градус падал в «тропики».
+        double now = ClimateService.temperature(p.x, p.z, p.y);
+        Forecast f = ClimateService.forecast(lat);
 
         StringBuilder sb = new StringBuilder();
         sb.append(String.format("Широта %.2f°, долгота %.2f° (%s)\n", lat, lon, ClimateZone.of(lat).title));

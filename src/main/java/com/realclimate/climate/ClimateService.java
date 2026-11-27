@@ -64,15 +64,10 @@ public final class ClimateService {
         return humidity(pos.getX(), pos.getZ());
     }
 
-    public static Forecast forecast(int band) {
-        double base = switch (band) {
-            case 0 -> -10.0; // Арктика
-            case 1 -> 0.0;   // Субарктика
-            case 2 -> 10.0;  // Умеренный
-            case 3 -> 20.0;  // Субтропики
-            default -> 25.0; // Тропики
-        };
-        return new Forecast(base);
+    /** Прогноз на 6 часов вперёд для широты точки: напрямую из климатической
+     * модели (сезонная норма на сегодня + суточный ход), без грубой таблицы зон. */
+    public static Forecast forecast(double lat) {
+        return new Forecast(lat);
     }
 
     public static double getBodyTemp(UUID uuid) {

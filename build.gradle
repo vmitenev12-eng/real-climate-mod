@@ -15,7 +15,7 @@ plugins {
 }
 apply plugin: 'org.spongepowered.mixin'
 
-version = '0.1.27'
+version = '0.1.28'
 group = 'com.realclimate'
 base { archivesName = 'real_climate-1.20.1-forge' }
 

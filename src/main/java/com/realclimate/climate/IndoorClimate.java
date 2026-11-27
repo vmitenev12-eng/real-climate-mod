@@ -197,7 +197,9 @@ public final class IndoorClimate {
     }
 
     /** Первый не-воздушный блок над точкой замера (до 12 блоков вверх): что
-     * именно находится между игроком и крышей — потолок, решётка или иное. */
+     * именно находится между игроком и крышей — потолок, решётка или иное.
+     * Плюс честно говорим, считает ли высотная карта воздух под этим блоком
+     * открытым небом — так видно слепоту MOTION_BLOCKING. */
     private static String ceilingAbove(Level level, BlockPos pos) {
         for (int dy = 1; dy <= 12; dy++) {
             BlockPos cur = pos.above(dy);
@@ -206,10 +208,24 @@ public final class IndoorClimate {
             if (!state.isAir()) {
                 net.minecraft.resources.ResourceLocation id =
                         net.minecraftforge.registries.ForgeRegistries.BLOCKS.getKey(state.getBlock());
-                return (id == null ? "?" : id.toString()) + " (+" + dy + ")";
+                return (id == null ? "?" : id.toString()) + " (+" + dy + "), небо под ним: "
+                        + (level.canSeeSky(cur.below()) ? "да" : "нет");
             }
         }
         return "чистое небо (12+ блоков воздуха)";
+    }
+
+    /** Высотная карта MOTION_BLOCKING слепа к блокам без ванильной коллизии
+     * (контейнеры LittleTiles) и местами врёт в колонках, где раньше стояли
+     * миниблоки: воздух под реальной крышей/решёткой ошибочно «видит небо»,
+     * и обход останавливался, не дойдя до блока над ним. Страховка: если
+     * прямо над клеткой стоит любой не-воздушный блок — это не улица.
+     * Смотрим ровно на 1 вверх: глубже нельзя, иначе навесы и кроны деревьев
+     * начнут считаться «крышей» и обход уйдёт сканировать улицу. */
+    private static boolean skyReallyOpen(Level level, BlockPos pos) {
+        BlockPos above = pos.above();
+        if (!level.isLoaded(above)) return true;
+        return level.getBlockState(above).isAir();
     }
 
     /**
@@ -558,7 +574,7 @@ public final class IndoorClimate {
                 if (!level.isLoaded(neighbor)) { overflow = true; continue; }
                 BlockState state = level.getBlockState(neighbor);
                 if (state.isAir()) {
-                    if (level.canSeeSky(neighbor)) {
+                    if (level.canSeeSky(neighbor) && skyReallyOpen(level, neighbor)) {
                         // открытый проход наружу: не расширяемся за пределы постройки
                         boundary.add(key);
                         openings += 0.5;

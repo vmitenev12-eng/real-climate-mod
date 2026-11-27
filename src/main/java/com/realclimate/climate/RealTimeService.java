@@ -100,16 +100,16 @@ public final class RealTimeService {
 
         // Небо у каждого игрока — своё: раз в секунду шлём ему «время неба»
         // для его широты/долготы (SolarService растягивает световой день на
-        // 0..12000 тиков, ночь — на 12000..24000). Пакет уходит после ванильной
-        // рассылки мирового времени в этом же тике, поэтому побеждает наш.
-        // Мировое время по-прежнему ведёт якорь (его слышат расписания жителей
-        // и прочая якорная логика), а освещённость, спавн, горение нежити и сон
+        // 0..12000 тиков, ночь — на 12000..24000). Фаза Луны — реальная (MoonService добавляет
+        // «номер дня»). Пакет уходит после ванильной рассылки мирового времени в этом же тике,
+        // поэтому побеждает наш. Мировое время по-прежнему ведёт якорь (его слышат расписания
+        // жителей и прочая якорная логика), а освещённость, спавн, горение нежити и сон
         // уже считаются по местному солнцу точки (MixinLevelReader и др.).
         for (ServerPlayer p : server.getPlayerList().getPlayers()) {
             double lat = Geo.latitude(p.getZ(), ClimateConfig.scale());
             double lon = Geo.longitude(p.getX(), ClimateConfig.scale());
             p.connection.send(new ClientboundSetTimePacket(
-                    p.level().getGameTime(), SolarService.skyTicks(lat, lon), false));
+                    p.level().getGameTime(), MoonService.dayTime(SolarService.skyTicks(lat, lon)), false));
         }
 
         // Глобальные дождь и гроза следуют живой погоде якорной точки: осадки в
@@ -140,7 +140,7 @@ public final class RealTimeService {
         double lat = Geo.latitude(p.getZ(), ClimateConfig.scale());
         double lon = Geo.longitude(p.getX(), ClimateConfig.scale());
         p.connection.send(new ClientboundSetTimePacket(
-                p.level().getGameTime(), SolarService.skyTicks(lat, lon), false));
+                p.level().getGameTime(), MoonService.dayTime(SolarService.skyTicks(lat, lon)), false));
     }
 
     private static double anchorWorldX() {

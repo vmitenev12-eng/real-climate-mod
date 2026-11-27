@@ -24,6 +24,7 @@ import net.minecraftforge.event.server.ServerStoppedEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Mod.EventBusSubscriber(modid = RealClimate.MODID)
@@ -42,6 +43,7 @@ public final class ClimateEvents {
         VentilationService.clear();
         RealTimeService.clear();
         IndoorClimate.clear();
+        WeatherService.clear();
     }
 
     @SubscribeEvent
@@ -77,12 +79,27 @@ public final class ClimateEvents {
     private static int time(CommandContext<CommandSourceStack> ctx) {
         CommandSourceStack src = ctx.getSource();
         Vec3 p = src.getPosition();
-        double hours = RealTimeService.localHours(p.x);
+        double lat = Geo.latitude(p.z, ClimateConfig.scale());
         double lon = Geo.longitude(p.x, ClimateConfig.scale());
-        String text = String.format("Локальное время: %02d:%02d (долгота %.1f°, UTC%+d)",
-                (int) hours, (int) ((hours % 1.0) * 60.0), lon, Math.round(lon / 15.0));
+        // Гражданское время точки: настоящий пояс из сети, без сети — долгота/15.
+        double hours = SolarService.civilHours(lat, lon);
+        Integer tz = WeatherService.utcOffsetSeconds(lat, lon);
+        int tzHours = tz != null ? tz / 3600 : (int) Math.round(lon / 15.0);
+        String text = String.format("Местное время: %s (долгота %.1f°, UTC%+d)", hm(hours), lon, tzHours);
         src.sendSuccess(() -> Component.literal(text), false);
         return 1;
+    }
+
+    /** Час вида 9.317 -> "9:19". */
+    private static String hm(double hours) {
+        int total = (int) Math.round((((hours % 24.0) + 24.0) % 24.0) * 60.0);
+        return String.format("%d:%02d", (total / 60) % 24, total % 60);
+    }
+
+    /** Длина дня в часах -> "5 ч 33 мин". */
+    private static String dayLen(double hours) {
+        int total = (int) Math.round(hours * 60.0);
+        return String.format("%d ч %02d мин", total / 60, total % 60);
     }
 
     private static int body(CommandContext<CommandSourceStack> ctx) {
@@ -165,14 +182,27 @@ public final class ClimateEvents {
         double scale = ClimateService.scale();
         double lat = Geo.latitude(p.z, scale);
         double lon = Geo.longitude(p.x, scale);
-        // Прогноз считаем от реальной широты: Geo.band отдавал floor(широты)
-        // в таблицу зон 0..3, и любой настоящий градус падал в «тропики».
+        boolean online = WeatherService.online(lat, lon);
         double now = ClimateService.temperature(p.x, p.z, p.y);
-        Forecast f = ClimateService.forecast(lat);
+        Forecast f = ClimateService.forecast(lat, lon);
 
         StringBuilder sb = new StringBuilder();
         sb.append(String.format("Широта %.2f°, долгота %.2f° (%s)\n", lat, lon, ClimateZone.of(lat).title));
-        sb.append(String.format("Сейчас: %.1f °C\n", now));
+        sb.append(String.format("Сейчас: %.1f °C (%s)\n", now,
+                online ? "живая погода, open-meteo" : "климатическая модель, офлайн"));
+        // Время и солнце в этой точке: у каждого игрока — свои, по его позиции.
+        double civil = SolarService.civilHours(lat, lon);
+        Integer tz = WeatherService.utcOffsetSeconds(lat, lon);
+        int tzHours = tz != null ? tz / 3600 : (int) Math.round(lon / 15.0);
+        sb.append(String.format("Местное время: %s (UTC%+d)", hm(civil), tzHours));
+        double[] rs = SolarService.sunriseSunset(lat, lon);
+        if (rs == null) {
+            double len = SolarService.dayLength(lat, LocalDate.now());
+            sb.append(len > 12.0 ? " | полярный день\n" : " | полярная ночь\n");
+        } else {
+            sb.append(String.format(" | восход %s, закат %s, день %s\n",
+                    hm(rs[0]), hm(rs[1]), dayLen(rs[1] - rs[0])));
+        }
         if (f == null) {
             sb.append("Прогноз считается, повторите команду через секунду.");
         } else {

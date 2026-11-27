@@ -182,8 +182,12 @@ public final class BodyTemperature {
         // (RealTimeService), так что эффект согласован с моделью день/ночь;
         // ночью и в дождь его нет. Стеклянная крыша пропускает лучи — теплица.
         if (!lv.isRaining() && !lv.isThundering()) {
-            double hours = RealTimeService.localHours(p.getX());
-            double sun = Math.sin(Math.PI * (hours - 6.0) / 12.0);
+            // Высота солнца — по настоящему световому дню этой широты и даты
+            // (SolarService): зимой в Архангельске солнце греет лишь около
+            // полудня, а не все «условные» 6:00–18:00.
+            double sun = SolarService.sunFactor(
+                    Geo.latitude(p.getZ(), ClimateConfig.scale()),
+                    Geo.longitude(p.getX(), ClimateConfig.scale()));
             if (sun > 0.0) {
                 if (lv.canSeeSky(pos)) {
                     t += 3.5 * sun;

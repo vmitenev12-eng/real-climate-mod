@@ -37,11 +37,21 @@ public final class ClimateService {
         double metersPerBlock = Math.max(1.0, ClimateConfig.scale());
         double lat = Geo.latitude(z, metersPerBlock);
         double lon = Geo.longitude(x, metersPerBlock);
-        int hour = (int) ((System.currentTimeMillis() / 3_600_000L) % 24);
-        double temp = ClimateModel.dailyMean(lat, LocalDate.now())
-                + ClimateModel.diurnal(lat, hour);
+        Double real = WeatherService.temperatureNow(lat, lon);
+        double temp;
+        if (real != null) {
+            // Живая погода из сети: реальное значение на улице прямо сейчас.
+            temp = real;
+        } else {
+            // Офлайн: климатическая модель. Суточный ход — по местному солнечному
+            // времени долготы (был «сырой» UTC-час: дневной пик в Архангельске
+            // приходился на 18:00 вместо 15:00 по местному).
+            int hour = (int) RealTimeService.localHours(x);
+            temp = ClimateModel.dailyMean(lat, LocalDate.now())
+                    + ClimateModel.diurnal(lat, hour);
+            temp += Math.sin(Math.toRadians(lon * 0.37)) * 1.2;
+        }
         temp -= Math.max(0.0, height - 64.0) * 0.0065;
-        temp += Math.sin(Math.toRadians(lon * 0.37)) * 1.2;
         return temp;
     }
 
@@ -55,8 +65,13 @@ public final class ClimateService {
         // с часом из игрового времени (со сдвигом на 6 часов) — отсюда
         // двойные амплитуды и скачки от блока к блоку.
         double temp = temperature(pos.getX(), pos.getZ(), pos.getY());
-        if (level.isRaining()) temp -= level.isThundering() ? 5.0 : 3.0;
-        if (level.isThundering()) temp -= 1.5;
+        // При живой погоде осадки уже учтены в реальном значении — не вычитаем дважды.
+        double metersPerBlock = Math.max(1.0, ClimateConfig.scale());
+        if (!WeatherService.online(Geo.latitude(pos.getZ(), metersPerBlock),
+                Geo.longitude(pos.getX(), metersPerBlock))) {
+            if (level.isRaining()) temp -= level.isThundering() ? 5.0 : 3.0;
+            if (level.isThundering()) temp -= 1.5;
+        }
         return temp;
     }
 
@@ -64,10 +79,10 @@ public final class ClimateService {
         return humidity(pos.getX(), pos.getZ());
     }
 
-    /** Прогноз на 6 часов вперёд для широты точки: напрямую из климатической
-     * модели (сезонная норма на сегодня + суточный ход), без грубой таблицы зон. */
-    public static Forecast forecast(double lat) {
-        return new Forecast(lat);
+    /** Прогноз на 6 часов вперёд для точки: живые данные open-meteo, а без
+     * сети — климатическая модель (сезонная норма + суточный ход). */
+    public static Forecast forecast(double lat, double lon) {
+        return new Forecast(lat, lon);
     }
 
     public static double getBodyTemp(UUID uuid) {

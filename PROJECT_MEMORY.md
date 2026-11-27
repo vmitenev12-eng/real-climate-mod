@@ -1,6 +1,6 @@
 # PROJECT_MEMORY — Real Climate Mod (Forge 1.20.1)
 Проект: work/real_climate_mod (GDD: input/GDD-Real-Climate-Mod (1).txt)
-Репо: github.com/vmitenev12-eng/real-climate-mod (private)
+Репо: github.com/vmitenev12-eng/real-climate-mod (public)
 
 ## Сделано
 - Java: RealClimate, registry/ModBlocks, ModCreativeTab, block/FacingBlock, item/HammerItem
@@ -28,3 +28,21 @@
 1. Сборка feature/room-air-climate на GitHub Actions, тест jar в игре (Pojav + сервер)
 2. Проверка: сквозняки у дверей, поведение кондиционеров в большой комнате, авторегулировка пульта
 3. Термодатчику — своя текстура (сейчас vent_metal), GUI пульта: показать фактическую температуру рядом с уставкой
+
+## Солнце и живая погода (0.1.29, 2026-11-27)
+- climate/SolarService: склонение (Спенсер), уравнение времени, восход/закат и длина дня
+  по широте+дате; местное время -> «небесные тики» (день 0..12000, ночь 12000..24000);
+  sunFactor для нагрева; пояс офлайн = round(долгота/15)
+- climate/WeatherService: open-meteo без ключа, фоновые запросы (daemon-поток), кэш клеток
+  0.5° на 30 мин; реальная температура, почасовой прогноз, настоящий часовой пояс,
+  точные восход/закат; офлайн/ошибка — молча климатическая модель. Конфиг online_weather
+- RealTimeService: персональное небо каждому игроку (ClientboundSetTimePacket раз в секунду
+  после ванильной рассылки); мировое время по-прежнему ведёт якорь; API ptm2
+  (isRealTime/zoneOffsetSeconds) не менялся
+- ClimateService.temperature: живая погода или модель; суточный ход по местному солнечному
+  часу (был сырой UTC); дождь/гроза не вычитаются дважды при живой погоде
+- BodyTemperature: нагрев от солнца по реальному световому дню широты (sunFactor)
+- /climate: местное время, восход/закат, длина дня, пометка источника (open-meteo/офлайн)
+- Контроль формул на 27.11: Москва 7:41/восход 8:28 (справ. 7:37/8:27),
+  Архангельск 5:17/9:28 (5:33/9:19), Гвинейский залив 12:07/5:45 (12:07/5:44);
+  с сетью open-meteo значения точные

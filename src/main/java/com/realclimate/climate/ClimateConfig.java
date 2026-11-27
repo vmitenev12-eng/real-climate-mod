@@ -11,6 +11,7 @@ public final class ClimateConfig {
     public static final ForgeConfigSpec.ConfigValue<String> TIME_ANCHOR;
     public static final ForgeConfigSpec.DoubleValue ORIGIN_LAT;
     public static final ForgeConfigSpec.DoubleValue ORIGIN_LON;
+    public static final ForgeConfigSpec.BooleanValue WEATHER_ONLINE;
     public static final ForgeConfigSpec.BooleanValue SNOW_MELT;
     public static final ForgeConfigSpec.BooleanValue WATER_FREEZE;
 
@@ -20,6 +21,7 @@ public final class ClimateConfig {
         ENABLE_CLIMATE = builder.comment("Включить климатическую систему").define("enabled", true);
         BASE_TEMP = builder.comment("Базовая температура (°C)").defineInRange("base_temp", 20.0, -50.0, 60.0);
         BASE_HUMIDITY = builder.comment("Базовая влажность (%)").defineInRange("base_humidity", 50.0, 0.0, 100.0);
+        WEATHER_ONLINE = builder.comment("Живая погода, точный часовой пояс и восход/закат из open-meteo.com (нужен интернет; без него — автономная климатическая модель и расчёт солнца)").define("online_weather", true);
         builder.pop();
         builder.push("time");
         REAL_TIME = builder.comment("Синхронизировать время суток с реальным временем по долготе (15° = 1 час)").define("real_time", true);

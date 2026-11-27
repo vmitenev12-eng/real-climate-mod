@@ -188,11 +188,28 @@ public final class IndoorClimate {
         RoomScan scan = findRoom(level, pos);
         if (scan == null) return "комната не найдена";
         DeviceTerms dev = resolveDevices(level, scan);
-        return String.format("объём %d | кондиционеров %d/%d | решёток %d/%d | утечки %.1f (небо %.1f, щели %.1f) | ограждение %.1f | переполнение %s | на границе: %s",
+        return String.format("объём %d | кондиционеров %d/%d | решёток %d/%d | утечки %.1f (небо %.1f, щели %.1f) | ограждение %.1f | переполнение %s | на границе: %s | над головой: %s",
                 scan.volume, dev.acCount, scan.acPositions.size(), dev.grilleCount, scan.grillePositions.size(),
                 scan.openings, scan.skyOpenings, scan.openings - scan.skyOpenings, scan.envelope,
                 scan.overflow ? "ДА" : "нет",
-                scan.boundaryDevices.isEmpty() ? "ничего" : scan.boundaryDevices);
+                scan.boundaryDevices.isEmpty() ? "ничего" : scan.boundaryDevices,
+                ceilingAbove(level, pos));
+    }
+
+    /** Первый не-воздушный блок над точкой замера (до 12 блоков вверх): что
+     * именно находится между игроком и крышей — потолок, решётка или иное. */
+    private static String ceilingAbove(Level level, BlockPos pos) {
+        for (int dy = 1; dy <= 12; dy++) {
+            BlockPos cur = pos.above(dy);
+            if (!level.isLoaded(cur)) return "?";
+            BlockState state = level.getBlockState(cur);
+            if (!state.isAir()) {
+                net.minecraft.resources.ResourceLocation id =
+                        net.minecraftforge.registries.ForgeRegistries.BLOCKS.getKey(state.getBlock());
+                return (id == null ? "?" : id.toString()) + " (+" + dy + ")";
+            }
+        }
+        return "чистое небо (12+ блоков воздуха)";
     }
 
     /**
@@ -555,12 +572,18 @@ public final class IndoorClimate {
                     continue;
                 }
                 boundary.add(key);
-                // Диагностика: какие блоки мода вообще касаются комнаты
-                // (видно в /climate body — «на границе: …»).
+                // Диагностика: какие блоки вообще касаются комнаты
+                // (видно в /climate body — «на границе: …»). Ваниль сворачиваем
+                // в один счётчик, блоки модов — поимённо: так видно и
+                // LittleTiles-контейнеры, и декорации других модов.
                 net.minecraft.resources.ResourceLocation bid =
                         net.minecraftforge.registries.ForgeRegistries.BLOCKS.getKey(state.getBlock());
-                if (bid != null && bid.getNamespace().equals("real_climate")) {
-                    boundaryBlocks.merge(bid.getPath(), 1, Integer::sum);
+                if (bid != null) {
+                    String ns = bid.getNamespace();
+                    String name = ns.equals("minecraft") ? "minecraft"
+                            : ns.equals("real_climate") ? bid.getPath()
+                            : ns + ":" + bid.getPath();
+                    boundaryBlocks.merge(name, 1, Integer::sum);
                 }
                 // Дующая приточная решётка — не дыра на улицу: магистраль нагнетает
                 // воздух В комнату, её вклад уже учтён термом струи. А вот решётка
@@ -595,7 +618,11 @@ public final class IndoorClimate {
         }
         StringBuilder devices = new StringBuilder();
         boundaryBlocks.entrySet().stream()
-                .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
+                .sorted((a, b) -> {
+                    boolean am = a.getKey().equals("minecraft"), bm = b.getKey().equals("minecraft");
+                    if (am != bm) return am ? 1 : -1;   // ваниль — в конец списка
+                    return Integer.compare(b.getValue(), a.getValue());
+                })
                 .forEach(e -> {
                     if (devices.length() > 0) devices.append(", ");
                     devices.append(e.getKey()).append("×").append(e.getValue());

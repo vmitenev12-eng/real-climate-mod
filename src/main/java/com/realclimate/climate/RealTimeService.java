@@ -4,6 +4,7 @@ import com.realclimate.RealClimate;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.GameRules;
+import net.minecraft.world.level.Level;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -41,6 +42,35 @@ public final class RealTimeService {
         double utcHours = (now % 86_400_000L) / 3_600_000.0;
         double lon = Geo.longitude(x, ClimateConfig.scale());
         return (utcHours + lon / 15.0 + 24.0) % 24.0;
+    }
+
+    /**
+     * Включена ли синхронизация времени суток с реальным временем. Для смежных модов (Public Transport Mod 2):
+     * когда true, время мира ведёт этот мод, а их собственные часы и расписания должны идти по поясу из
+     * {@link #zoneOffsetSeconds(Level)}.
+     */
+    public static boolean isRealTime() {
+        try {
+            return ClimateConfig.REAL_TIME.get();
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    /**
+     * Смещение часового пояса от UTC в секундах для якорной долготы (спавн мира или число из конфига):
+     * долгота / 15 часов. Работает и на клиенте (нужен только спавн уровня и конфиг масштаба), поэтому часы
+     * на клиенте и сервере совпадают с небом.
+     */
+    public static int zoneOffsetSeconds(Level level) {
+        double lon;
+        String anchor = ClimateConfig.TIME_ANCHOR.get();
+        try {
+            lon = Math.max(-180.0, Math.min(180.0, Double.parseDouble(anchor)));
+        } catch (NumberFormatException ignored) {
+            lon = Geo.longitude(level.getSharedSpawnPos().getX(), ClimateConfig.scale());
+        }
+        return (int) Math.round(lon / 15.0 * 3600.0);
     }
 
     @SubscribeEvent

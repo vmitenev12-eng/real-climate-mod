@@ -6,7 +6,6 @@
   "refmap": "real_climate.refmap.json",
   "mixins": [
     "MixinBiome",
-    "MixinLevelReader",
     "MixinMobSun"
   ],
   "client": [],

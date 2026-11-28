@@ -21,6 +21,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.client.event.RenderGuiOverlayEvent;
 import net.minecraftforge.client.event.RenderLevelStageEvent;
+import net.minecraftforge.client.gui.overlay.VanillaGuiOverlay;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -226,6 +227,12 @@ public final class KeyOverlayRenderer {
 
     @SubscribeEvent
     public static void onOverlay(RenderGuiOverlayEvent.Post e) {
+        // Раньше строка рисовалась после КАЖДОГО ванильного оверлея (в том числе после
+        // чата) — поэтому она оказывалась поверх чата и накладывалась на его строки.
+        // Теперь только один раз за кадр, сразу после хотбара, ДО чата: чат рисуется
+        // поверх и ничего не портит.
+        if (e.getOverlay() != VanillaGuiOverlay.HOTBAR.type()) return;
+
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.level == null) return;
 
@@ -241,7 +248,6 @@ public final class KeyOverlayRenderer {
         // Предупреждения о замерзании/перегреве — под текстом HUD, но над миром.
         if (!mc.options.hideGui) renderThermalWarnings(e.getGuiGraphics(), body, w, h);
 
-        // Текст поднят выше панели инструментов и брони, чтобы не перекрывать их.
         if (w < 320) {
             e.getGuiGraphics().drawString(mc.font, Component.literal(String.format("Тело %.1f°C", body)),
                     6, h - 84, 0xFFFFFFFF, true);
@@ -250,10 +256,12 @@ public final class KeyOverlayRenderer {
             e.getGuiGraphics().drawString(mc.font, Component.literal(String.format("Тепло %.0f%%", insulation * 100.0)),
                     6, h - 64, 0xFFFFFFFF, true);
         } else {
+            // Строка стоит над хотбаром по центру, выровнена по его левому краю:
+            // не в левом нижнем углу, где живёт чат.
             e.getGuiGraphics().drawString(mc.font,
                     Component.literal(String.format("Тело: %.1f°C  |  Воздух: %.1f°C  |  Утепление: %.0f%%",
                             body, ambient, insulation * 100.0)),
-                    10, h - 66, 0xFFFFFFFF, true);
+                    w / 2 - 91, h - 59, 0xFFFFFFFF, true);
         }
 
         if (!isHoldingInstallationKey(mc)) return;

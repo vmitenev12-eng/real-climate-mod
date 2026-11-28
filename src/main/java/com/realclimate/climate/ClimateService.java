@@ -17,6 +17,11 @@ public final class ClimateService {
     private static double globalScale = 1.0;
     private static boolean started = false;
 
+    /** Высота (Y), выше которой начинается снижение температуры с высотой (горы). */
+    public static final double LAPSE_START_Y = 100.0;
+    /** Падение температуры выше LAPSE_START_Y, °C на блок (реальный градиент 6,5 °C на километр). */
+    public static final double LAPSE_PER_BLOCK = 0.0065;
+
     private ClimateService() {}
 
     public static void start(long seed) {
@@ -51,7 +56,9 @@ public final class ClimateService {
                     + ClimateModel.diurnal(lat, hour);
             temp += Math.sin(Math.toRadians(lon * 0.37)) * 1.2;
         }
-        temp -= Math.max(0.0, height - 64.0) * 0.0065;
+        // Базовая температура — живая погода (или формула широты); охлаждение от высоты начинается
+        // только выше Y=100 и идёт плавно (6,5 °C на 1000 блоков подъёма).
+        temp -= Math.max(0.0, height - LAPSE_START_Y) * LAPSE_PER_BLOCK;
         return temp;
     }
 

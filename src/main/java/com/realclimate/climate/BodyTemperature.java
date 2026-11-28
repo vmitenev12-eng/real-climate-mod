@@ -53,6 +53,8 @@ public final class BodyTemperature {
     private static final String WET_KEY = "realclimate_wet";
     private static final int PERIOD = 10;
     private static final int INDOOR_PERIOD = 40;
+    /** Максимум охлаждения от естественного снега и льда вокруг (в помещении), °C. */
+    private static final double NATURAL_COLD_CAP = 4.0;
     private static final Map<UUID, AmbientCache> AMBIENT_CACHE = new ConcurrentHashMap<>();
 
     // Клиентская копия серверных значений (заполняется только из пакета).
@@ -249,9 +251,15 @@ public final class BodyTemperature {
     private record AmbientCache(net.minecraft.resources.ResourceKey<Level> dimension, BlockPos pos,
                                 long gameTime, double temperature) {}
 
-    /** Heat and cold travel only through connected air cells, not through solid walls. */
+    /**
+     * Heat and cold travel only through connected air cells, not through solid walls.
+     * Естественный снег и лёд холодят только в закрытом помещении и не сильнее
+     * NATURAL_COLD_CAP: на улице их холод уже входит в температуру воздуха, иначе
+     * в заснеженной местности сотни блоков снега давали бы -40 °C и ниже.
+     */
     public static double heatNearby(Level lv, BlockPos c) {
         double heat = 0;
+        double cold = 0;
         java.util.ArrayDeque<BlockPos> queue = new java.util.ArrayDeque<>();
         java.util.Map<BlockPos, Integer> distances = new java.util.HashMap<>();
         java.util.Set<BlockPos> countedSources = new java.util.HashSet<>();
@@ -268,7 +276,12 @@ public final class BodyTemperature {
                 BlockState state = lv.getBlockState(neighbor);
                 double source = sourceStrength(lv, neighbor, state);
                 if (source != 0.0 && countedSources.add(neighbor)) {
-                    heat += source * (1.0 - Math.min(1.0, (distance + 1) / 16.0));
+                    double weighted = source * (1.0 - Math.min(1.0, (distance + 1) / 16.0));
+                    if (isNaturalCold(state)) {
+                        cold += weighted;
+                    } else {
+                        heat += weighted;
+                    }
                 }
 
                 if (distance >= 15 || distances.containsKey(neighbor)
@@ -277,7 +290,15 @@ public final class BodyTemperature {
                 queue.addLast(neighbor);
             }
         }
+        heat += Math.max(-NATURAL_COLD_CAP, cold);
         return Math.max(-100.0, Math.min(100.0, heat));
+    }
+
+    /** Снег и лёд природного происхождения (не приборы и не огонь). */
+    private static boolean isNaturalCold(BlockState state) {
+        return state.is(Blocks.SNOW_BLOCK) || state.is(Blocks.POWDER_SNOW) || state.is(Blocks.ICE)
+                || state.is(Blocks.PACKED_ICE) || state.is(Blocks.BLUE_ICE) || state.is(Blocks.FROSTED_ICE)
+                || state.is(Blocks.SNOW);
     }
 
     public static double sourceStrength(Level level, BlockPos pos, BlockState state) {
@@ -289,15 +310,15 @@ public final class BodyTemperature {
                 && hasBooleanProperty(state, "lit", true)) return enclosed ? 5.0 : 2.0;
         if (state.is(Blocks.TORCH) || state.is(Blocks.WALL_TORCH)) return enclosed ? 1.0 : 0.5;
 
-        // Холодные источники — симметрично тёплым: сугроб морозит окрестность
-        // так же, как факел её греет.
-        if (state.is(Blocks.SNOW_BLOCK)) return enclosed ? -1.5 : -0.8;
-        if (state.is(Blocks.POWDER_SNOW)) return enclosed ? -2.0 : -1.2;
+        // Холодные источники — только в закрытом помещении (ледяная пещера, иглу):
+        // под открытым небом холод снега уже учтён в температуре воздуха.
+        if (state.is(Blocks.SNOW_BLOCK)) return enclosed ? -1.5 : 0.0;
+        if (state.is(Blocks.POWDER_SNOW)) return enclosed ? -2.0 : 0.0;
         if (state.is(Blocks.ICE) || state.is(Blocks.PACKED_ICE) || state.is(Blocks.BLUE_ICE)
-                || state.is(Blocks.FROSTED_ICE)) return enclosed ? -1.0 : -0.5;
+                || state.is(Blocks.FROSTED_ICE)) return enclosed ? -1.0 : 0.0;
         if (state.is(Blocks.SNOW)) {
             int layers = state.getValue(SnowLayerBlock.LAYERS);
-            return (enclosed ? -0.10 : -0.05) * layers;
+            return enclosed ? -0.10 * layers : 0.0;
         }
 
         if (state.getBlock() instanceof com.realclimate.block.RadiatorBlock
